@@ -8,6 +8,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.cors import CORSMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.api import admin, public
 from app.config import get_settings
@@ -29,6 +31,31 @@ DASHBOARD_CSP = "; ".join(
         "form-action 'self'",
     ]
 )
+
+
+# Únicas rutas que se pueden llamar desde un navegador de otro dominio (p. ej. App-testeo-APIs).
+CORS_PATHS = frozenset({"/v1/models", "/v1/chat/completions"})
+
+
+class PathScopedCORS:
+    """CORS solo para CORS_PATHS; el resto de la API (dashboard incluido) no envía cabeceras CORS."""
+
+    def __init__(self, app: ASGIApp, allow_origins: list[str]):
+        self.app = app
+        self.cors = CORSMiddleware(
+            app,
+            allow_origins=allow_origins,
+            allow_methods=["GET", "POST", "OPTIONS"],
+            allow_headers=["authorization", "content-type"],
+            allow_credentials=False,  # la autenticación va por Bearer, no por cookies
+            max_age=600,
+        )
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope["path"] in CORS_PATHS:
+            await self.cors(scope, receive, send)
+        else:
+            await self.app(scope, receive, send)
 
 
 @asynccontextmanager
@@ -62,6 +89,9 @@ def create_app() -> FastAPI:
             if "/_next/static/" not in path:
                 response.headers["Cache-Control"] = "no-cache"
         return response
+
+    if settings.cors_allowed_origins:
+        app.add_middleware(PathScopedCORS, allow_origins=settings.cors_allowed_origins)
 
     app.include_router(public.router)
     app.include_router(admin.router)

@@ -61,6 +61,8 @@ class Settings:
     enable_docs: bool = False
     max_messages: int = 100
     max_input_chars: int = 48_000
+    # Orígenes web que pueden llamar a /v1/models y /v1/chat/completions desde el navegador.
+    cors_allowed_origins: list[str] = field(default_factory=list)
 
     # --- Dashboard / administración ---
     cookie_secure: bool = True
@@ -96,6 +98,7 @@ def load_settings() -> Settings:
         enable_docs=_bool("ENABLE_DOCS", False),
         max_messages=_int("MAX_MESSAGES", 100),
         max_input_chars=_int("MAX_INPUT_CHARS", 48_000),
+        cors_allowed_origins=_list("CORS_ALLOWED_ORIGINS") if os.getenv("CORS_ALLOWED_ORIGINS") is not None else ["https://devmark-pe.github.io"],
         cookie_secure=_bool("COOKIE_SECURE", True),
         session_ttl_hours=_int("SESSION_TTL_HOURS", 12),
         dashboard_dir=os.getenv("DASHBOARD_DIR") or default_dashboard,
