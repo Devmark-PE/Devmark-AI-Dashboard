@@ -114,3 +114,30 @@ def test_application_delete_requires_no_keys(app_and_key):
     assert client.delete(f"/api/admin/applications/{app_['id']}", headers=csrf).status_code == 409
     client.delete(f"/api/admin/api-keys/{key['id']}", headers=csrf)
     assert client.delete(f"/api/admin/applications/{app_['id']}", headers=csrf).status_code == 204
+
+
+def test_regenerate_with_grace_period(app_and_key, ollama):
+    client, csrf, app_, key = app_and_key
+    client.patch(f"/api/admin/api-keys/{key['id']}", json={"permissions": ["chat"], "rate_limit_rpm": 30}, headers=csrf)
+
+    r = client.post(f"/api/admin/api-keys/{key['id']}/regenerate", json={"grace_hours": 24}, headers=csrf)
+    assert r.status_code == 201
+    new = r.json()
+    assert new["key"] != key["key"] and new["key"].startswith("dmk_live_")
+    assert new["name"] == key["name"] and new["application_id"] == app_["id"]
+    assert new["permissions"] == ["chat"] and new["rate_limit_rpm"] == 30
+
+    # Ambas funcionan durante el periodo de gracia; la anterior tiene fecha de expiración.
+    assert client.post("/v1/chat/completions", json=BODY, headers=bearer(new["key"])).status_code == 200
+    assert client.post("/v1/chat/completions", json=BODY, headers=bearer(key["key"])).status_code == 200
+    old = next(k for k in client.get("/api/admin/api-keys").json() if k["id"] == key["id"])
+    assert old["name"] == "Producción (anterior)" and old["expires_at"] is not None
+    assert new["key"] not in client.get("/api/admin/api-keys").text
+
+
+def test_regenerate_without_grace_revokes_old(app_and_key, ollama):
+    client, csrf, app_, key = app_and_key
+    new = client.post(f"/api/admin/api-keys/{key['id']}/regenerate", json={"grace_hours": 0}, headers=csrf).json()
+    assert client.post("/v1/chat/completions", json=BODY, headers=bearer(key["key"])).json() == {"detail": "API key revocada"}
+    assert client.post("/v1/chat/completions", json=BODY, headers=bearer(new["key"])).status_code == 200
+    assert client.post(f"/api/admin/api-keys/{key['id']}/regenerate", json={"grace_hours": 5}, headers=csrf).status_code == 422

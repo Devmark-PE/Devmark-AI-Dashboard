@@ -5,7 +5,7 @@ por aplicación, logs, uso, estado del sistema y un dashboard de administración
 
 ```
 Clientes ── https://ai.devmarkpe.com/v1 ── Nginx ── FastAPI ─┬─ Ollama (127.0.0.1:11434)
-Admin ───── https://ai.devmarkpe.com/dashboard ─────────────┘└─ PostgreSQL / Supabase
+Admin ───── https://ai.devmarkpe.com  (el navegador entra directo al dashboard) ─────────────┘└─ PostgreSQL / Supabase
 ```
 
 ## Estructura
@@ -20,7 +20,8 @@ Admin ───── https://ai.devmarkpe.com/dashboard ───────�
 | `migrations/` | Alembic (0001 esquema, 0002 bloqueo de la API REST de Supabase) |
 | `frontend/` | Dashboard Next.js + TypeScript + Tailwind (export estático) |
 | `app/static/dashboard/` | Build del dashboard que sirve FastAPI en `/dashboard` |
-| `deploy/` | Servicio systemd y **guía de despliegue** (`deploy/DEPLOY.md`) |
+| `deploy/` | Servicio systemd, **guía de despliegue** (`deploy/DEPLOY.md`), Nginx (`deploy/nginx/`) y Ollama (`deploy/ollama/`) |
+| `docs/` | **`ARQUITECTURA.md`** (cómo funciona todo) y **`PENDIENTES.md`** (tareas humanas con instrucciones) |
 
 ## Seguridad
 
@@ -35,7 +36,7 @@ Admin ───── https://ai.devmarkpe.com/dashboard ───────�
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest                       # 32 tests (SQLite); TEST_DATABASE_URL=postgresql+psycopg://… para PostgreSQL
+.venv/bin/pytest                       # tests (SQLite); TEST_DATABASE_URL=postgresql+psycopg://… para PostgreSQL
 
 cd frontend && npm install
 npm run dev                            # http://localhost:3000/dashboard (proxy a FastAPI en :8000)

@@ -1,6 +1,7 @@
 """API pública: los endpoints originales, con el mismo contrato de respuesta.
 
-GET  /                      público
+GET  /                      público (navegadores -> 302 a /dashboard/, el resto recibe el JSON de siempre)
+GET  /status                público (JSON de / + estado de Ollama)
 GET  /health                público (ahora comprueba Ollama de verdad)
 POST /chat                  sin key por defecto (CHAT_REQUIRE_API_KEY=true para exigirla)
 POST /v1/chat/completions   Authorization: Bearer <API_KEY>, permiso "chat"
@@ -14,7 +15,7 @@ import uuid
 from typing import Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Header, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from app.api.deps import authenticate, client_ip
@@ -133,9 +134,27 @@ def _messages_text(messages: list[dict[str, str]]) -> str:
 # Endpoints
 # --------------------------------------------------------------------------
 
-@router.get("/")
-async def root():
+def _service_info() -> dict[str, str]:
     return {"status": "online", "service": "Devmark AI API", "model": get_settings().default_model}
+
+
+@router.get("/")
+async def root(request: Request):
+    # Negociación de contenido: un navegador (Accept con text/html) va al dashboard;
+    # curl, SDKs, Accept: application/json, */* o sin Accept reciben el JSON de siempre.
+    if "text/html" in request.headers.get("accept", "").lower():
+        return RedirectResponse("/dashboard/", status_code=302, headers={"Vary": "Accept"})
+    return JSONResponse(_service_info(), headers={"Vary": "Accept"})
+
+
+@router.get("/status")
+async def status():
+    try:
+        await ollama.version()
+        ollama_state = "connected"
+    except ollama.OllamaError:
+        ollama_state = "unreachable"
+    return {**_service_info(), "ollama": ollama_state}
 
 
 @router.get("/health")

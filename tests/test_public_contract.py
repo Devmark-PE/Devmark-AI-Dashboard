@@ -11,6 +11,27 @@ def test_root(client):
     assert client.get("/").json() == {"status": "online", "service": "Devmark AI API", "model": "llama3.2:1b"}
 
 
+BROWSER_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+SERVICE_INFO = {"status": "online", "service": "Devmark AI API", "model": "llama3.2:1b"}
+
+
+def test_root_browser_redirects_to_dashboard(client):
+    r = client.get("/", headers={"Accept": BROWSER_ACCEPT}, follow_redirects=False)
+    assert r.status_code == 302 and r.headers["location"] == "/dashboard/"
+
+
+def test_root_json_accept_keeps_contract(client):
+    r = client.get("/", headers={"Accept": "application/json"})
+    assert r.status_code == 200 and r.json() == SERVICE_INFO
+
+
+def test_status(client, ollama):
+    r = client.get("/status")
+    assert r.status_code == 200 and r.json() == {**SERVICE_INFO, "ollama": "connected"}
+    ollama.get("/api/version").mock(side_effect=httpx.ConnectError("down"))
+    r = client.get("/status")
+    assert r.status_code == 200 and r.json() == {**SERVICE_INFO, "ollama": "unreachable"}
+
 def test_health_real_check(client, ollama):
     assert client.get("/health").json() == {"status": "healthy", "ollama": "connected"}
     ollama.get("/api/version").mock(side_effect=httpx.ConnectError("down"))
