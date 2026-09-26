@@ -24,7 +24,7 @@ export function LogoMark({ className = "size-7" }: { className?: string }) {
 export function Wordmark({ className = "text-[15px]", badge = true }: { className?: string; badge?: boolean }) {
   return (
     <span className="inline-flex items-center gap-1.5 leading-none">
-      <span className={`font-brand font-semibold tracking-[0.06em] text-fg ${className}`}>
+      <span className={`font-brand font-normal tracking-[0.06em] text-fg ${className}`}>
         DEV<span className="text-fg-2">MARK</span>
       </span>
       {badge && <span className="rounded-md bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-accent-strong">AI</span>}

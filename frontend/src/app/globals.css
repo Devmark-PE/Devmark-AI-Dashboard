@@ -65,11 +65,12 @@
   --axis: #c3c2b7;
 }
 
-/* Fuente de marca: Braze (DawnCreative). Coloca el archivo con licencia de uso web en
-   frontend/public/fonts/Braze.woff2 (o .otf). Si no existe, se usa la fuente de la interfaz. */
+/* Fuente de marca: Braze, solo mayúsculas A–Z (subconjunto de 4 KB, public/fonts/Braze.woff2).
+   Se usa únicamente en el nombre DEVMARK; cualquier otro carácter cae a la fuente de la interfaz. */
 @font-face {
   font-family: "Braze";
-  src: url("/dashboard/fonts/Braze.woff2") format("woff2"), url("/dashboard/fonts/Braze.otf") format("opentype");
+  src: url("/dashboard/fonts/Braze.woff2") format("woff2");
+  unicode-range: U+0020, U+0041-005A;
   font-display: swap;
 }
 
