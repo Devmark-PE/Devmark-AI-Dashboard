@@ -33,7 +33,6 @@ Puertos abiertos a Internet: solo 22 (SSH), 80 y 443. FastAPI, Ollama y la base 
 | `GET /health` | Público | `200 healthy` si Ollama responde, `503 degraded` si no |
 | `POST /v1/chat/completions` | API key, permiso `chat` | Chat compatible con OpenAI |
 | `GET /v1/models` | API key, permiso `models` | Modelos disponibles |
-| `POST /chat` | Público (hasta activar `CHAT_REQUIRE_API_KEY=true`) | Endpoint original simple |
 | `/dashboard/` | Login de administrador | Consola web |
 | `/api/admin/*` | Cookie de sesión + CSRF | API que usa el dashboard |
 | `/docs`, `/openapi.json` | Bloqueados (404) | Se activan solo con `ENABLE_DOCS=true` |

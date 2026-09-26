@@ -18,6 +18,7 @@ Orden recomendado: de arriba a abajo. Marca `[x]` al terminar.
 - [x] Ollama ajustado para 2 GB (`deploy/ollama/install.sh`, contexto 2048).
 - [x] `API_KEY_PEPPER` respaldado fuera del servidor.
 - [x] Ubuntu actualizado y servidor reiniciado; `nginx`, `ollama` y `devmark-ai` activos.
+- [x] Endpoint `POST /chat` eliminado (no lo usaba ninguna app; la API es `/v1/chat/completions`).
 - [x] CORS activo para App-testeo-APIs (`https://devmark-pe.github.io`, solo `/v1/models` y `/v1/chat/completions`; otro dominio: `CORS_ALLOWED_ORIGINS` en `.env`).
 
 ---
@@ -40,25 +41,13 @@ Orden recomendado: de arriba a abajo. Marca `[x]` al terminar.
    echo "LEGACY_API_KEY_ENABLED=false" >> ~/ai-server/.env && sudo systemctl restart devmark-ai
    ```
 
-## 3. Proteger `/chat` 🟡
-
-**Comprobar si alguien lo usa** (dashboard → Logs → filtro endpoint `/chat`, o SSH):
-```bash
-sudo zgrep -h '"POST /chat' /var/log/nginx/access.log* | awk '{print $1, $9}' | sort | uniq -c | sort -rn | head
-```
-Si no hay ninguna app tuya (solo bots o nada):
-```bash
-echo "CHAT_REQUIRE_API_KEY=true" >> ~/ai-server/.env && sudo systemctl restart devmark-ai
-```
-**Comprobar:** `curl -s -X POST https://ai.devmarkpe.com/chat -H 'Content-Type: application/json' -d '{"message":"hola"}'` → `{"detail":"API key requerida"}`.
-
-## 4. Decisiones pendientes 🔵
+## 3. Decisiones pendientes 🔵
 
 - **RAM**: seguir en t4g.small (2 GB) o subir a t4g.medium (4 GB, ~12 USD/mes más).
   Antes de cambiar el tipo de instancia hay que asignar una **Elastic IP** a `34.204.181.237` (EC2 → Elastic IPs); si no, la IP cambia y el DNS deja de apuntar.
 - **Supabase plan gratuito**: se pausa tras 7 días sin actividad. Si la API recibe tráfico a diario no pasa; si se pausa, reactívalo desde la consola.
 
-## 5. Flujo de trabajo con ramas
+## 4. Flujo de trabajo con ramas
 
 - Se trabaja en **`dev`**. Para publicar: GitHub → *Pull requests* → *New* → base `main` ← compare `dev` → *Create* → *Merge*.
 - Después del merge, actualiza el servidor con el comando de `docs/ARQUITECTURA.md` §9.

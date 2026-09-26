@@ -164,7 +164,6 @@ export interface PlatformSettings {
   allowed_models: string[];
   ollama_max_concurrency: number;
   legacy_api_key_enabled: boolean;
-  chat_require_api_key: boolean;
   log_request_content: boolean;
   max_messages: number;
   max_input_chars: number;

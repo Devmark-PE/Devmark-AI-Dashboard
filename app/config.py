@@ -57,7 +57,6 @@ class Settings:
     legacy_api_key_enabled: bool = True
 
     # --- Endpoints públicos ---
-    chat_require_api_key: bool = False
     enable_docs: bool = False
     max_messages: int = 100
     max_input_chars: int = 48_000
@@ -94,7 +93,6 @@ def load_settings() -> Settings:
         api_key_pepper=os.getenv("API_KEY_PEPPER") or None,
         legacy_api_key=os.getenv("DEVmark_API_KEY") or None,
         legacy_api_key_enabled=_bool("LEGACY_API_KEY_ENABLED", True),
-        chat_require_api_key=_bool("CHAT_REQUIRE_API_KEY", False),
         enable_docs=_bool("ENABLE_DOCS", False),
         max_messages=_int("MAX_MESSAGES", 100),
         max_input_chars=_int("MAX_INPUT_CHARS", 48_000),

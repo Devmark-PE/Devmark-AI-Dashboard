@@ -3,7 +3,6 @@
 GET  /                      público (navegadores -> 302 a /dashboard/, el resto recibe el JSON de siempre)
 GET  /status                público (JSON de / + estado de Ollama)
 GET  /health                público (ahora comprueba Ollama de verdad)
-POST /chat                  sin key por defecto (CHAT_REQUIRE_API_KEY=true para exigirla)
 POST /v1/chat/completions   Authorization: Bearer <API_KEY>, permiso "chat"
 GET  /v1/models             Authorization: Bearer <API_KEY>, permiso "models"
 """
@@ -30,11 +29,6 @@ router = APIRouter()
 # --------------------------------------------------------------------------
 # Esquemas
 # --------------------------------------------------------------------------
-
-class ChatRequest(BaseModel):
-    message: str
-    model: str | None = None
-
 
 class ContentPart(BaseModel):
     type: str = "text"
@@ -164,39 +158,6 @@ async def health():
     except ollama.OllamaError:
         return JSONResponse(status_code=503, content={"status": "degraded", "ollama": "unreachable"})
     return {"status": "healthy", "ollama": "connected"}
-
-
-@router.post("/chat")
-async def chat(
-    body: ChatRequest,
-    request: Request,
-    background: BackgroundTasks,
-    authorization: str | None = Header(default=None),
-):
-    settings = get_settings()
-    started = time.perf_counter()
-    context = await authenticate(authorization, "chat") if settings.chat_require_api_key else None
-
-    model = body.model or settings.default_model
-    messages = [{"role": "user", "content": body.message}]
-    invalid = _validate_input(model, messages)
-    if invalid is not None:
-        return invalid
-
-    try:
-        data = await ollama.chat(model, messages)
-    except ollama.OllamaError as exc:
-        _log(background, request, context, "/chat", exc.status_code, started, model, error=exc.message)
-        return JSONResponse(status_code=exc.status_code, content=exc.to_openai(), background=background)
-
-    content = data.get("message", {}).get("content", "")
-    _log(
-        background, request, context, "/chat", 200, started, data.get("model", model),
-        prompt_tokens=data.get("prompt_eval_count", 0) or 0,
-        completion_tokens=data.get("eval_count", 0) or 0,
-        request_content=body.message, response_content=content,
-    )
-    return JSONResponse({"model": data.get("model", model), "response": content}, background=background)
 
 
 @router.post("/v1/chat/completions")

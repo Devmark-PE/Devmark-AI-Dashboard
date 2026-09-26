@@ -27,7 +27,6 @@ def get_platform_settings(db: Session = Depends(get_admin_db), ctx: AdminContext
         "allowed_models": s.allowed_models,
         "ollama_max_concurrency": s.ollama_max_concurrency,
         "legacy_api_key_enabled": bool(s.legacy_api_key_enabled and s.legacy_api_key),
-        "chat_require_api_key": s.chat_require_api_key,
         "log_request_content": s.log_request_content,
         "max_messages": s.max_messages,
         "max_input_chars": s.max_input_chars,

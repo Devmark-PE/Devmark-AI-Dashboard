@@ -35,7 +35,7 @@ def test_other_origins_rejected(client):
 
 
 def test_other_paths_have_no_cors(client, ollama):
-    for path in ("/health", "/chat", "/status", "/api/admin/auth/login", "/api/admin/api-keys"):
+    for path in ("/health", "/status", "/api/admin/auth/login", "/api/admin/api-keys"):
         r = preflight(client, path)
         assert "access-control-allow-origin" not in r.headers, path
     r = client.get("/health", headers={"Origin": ORIGIN})

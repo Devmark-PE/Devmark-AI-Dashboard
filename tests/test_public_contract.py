@@ -114,8 +114,7 @@ def test_models_shape(client, ollama):
     }
 
 
-def test_chat_endpoint_unchanged(client, ollama):
-    # /chat sigue sin exigir key por defecto (CHAT_REQUIRE_API_KEY=false) hasta confirmar que nadie lo usa.
-    r = client.post("/chat", json={"message": "hola"})
-    assert r.status_code == 200 and r.json() == {"model": "llama3.2:1b", "response": "Hola!"}
-    assert client.post("/chat", json={}).status_code == 422
+def test_legacy_chat_endpoint_removed(client, ollama):
+    # POST /chat (endpoint original sin autenticación) se eliminó: ninguna app lo usaba.
+    assert client.post("/chat", json={"message": "hola"}).status_code in (404, 405)
+    assert not ollama.calls
