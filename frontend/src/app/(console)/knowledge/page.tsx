@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Library, Plus, Search, Trash2, Upload } from "lucide-react";
+import { ChevronDown, Download, FileText, Lightbulb, Library, Plus, Search, Star, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -10,6 +10,7 @@ import {
   Card,
   CardHeader,
   ConfirmDialog,
+  CopyButton,
   EmptyState,
   ErrorState,
   Field,
@@ -28,6 +29,7 @@ import {
 import { api, ApiError } from "@/lib/api";
 import { formatBytes, formatDate, formatNumber } from "@/lib/format";
 import { useResource } from "@/lib/hooks";
+import { downloadText, RAG_FORMATS, RAG_TEMPLATE, RAG_TIPS } from "@/lib/guides";
 import type { Application, RagDocument, RagResult } from "@/lib/types";
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
@@ -39,6 +41,79 @@ function readAsBase64(file: File): Promise<string> {
     reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
     reader.readAsDataURL(file);
   });
+}
+
+/* ------------------------------------------------------------------ */
+/* Guía: cómo preparar documentos                                        */
+/* ------------------------------------------------------------------ */
+
+function RagGuide({ defaultOpen }: { defaultOpen: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Card>
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-3 px-5 py-4 text-left">
+        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-strong">
+          <Lightbulb className="size-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-fg">Cómo preparar tus documentos</span>
+          <span className="block text-[13px] text-fg-3">Qué formato usar y cómo escribir para que la IA encuentre la respuesta correcta.</span>
+        </span>
+        <ChevronDown className={cx("size-4 text-fg-3 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="grid gap-6 border-t border-line px-5 py-5 lg:grid-cols-2">
+          <div className="space-y-5">
+            <section>
+              <h3 className="text-xs font-semibold tracking-wide text-fg-3 uppercase">Formato recomendado</h3>
+              <ul className="mt-2 divide-y divide-line rounded-lg border border-line">
+                {RAG_FORMATS.map((f) => (
+                  <li key={f.format} className="flex items-start gap-3 px-3 py-2.5">
+                    <span className="flex w-14 shrink-0 gap-0.5 pt-0.5" aria-label={`${f.rating} de 3`}>
+                      {[1, 2, 3].map((n) => (
+                        <Star key={n} className={cx("size-3.5", n <= f.rating ? "fill-warning text-warning" : "text-line-strong")} aria-hidden />
+                      ))}
+                    </span>
+                    <span className="min-w-0 text-[13px]">
+                      <span className="font-medium text-fg">{f.format}</span> <span className="text-fg-3">— {f.note}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <section>
+              <h3 className="text-xs font-semibold tracking-wide text-fg-3 uppercase">Cómo escribirlo</h3>
+              <ol className="mt-2 space-y-2">
+                {RAG_TIPS.map((t, i) => (
+                  <li key={t.title} className="flex gap-2.5 text-[13px]">
+                    <span className="grid size-5 shrink-0 place-items-center rounded-full bg-surface-3 text-[11px] font-semibold text-fg-2">{i + 1}</span>
+                    <span>
+                      <span className="font-medium text-fg">{t.title}.</span> <span className="text-fg-2">{t.text}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          </div>
+          <section className="min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-xs font-semibold tracking-wide text-fg-3 uppercase">Plantilla (.md)</h3>
+              <div className="flex gap-1">
+                <CopyButton value={RAG_TEMPLATE} variant="ghost" className="!h-7" />
+                <Button size="sm" variant="ghost" icon={<Download className="size-3.5" />} onClick={() => downloadText("plantilla-conocimiento.md", RAG_TEMPLATE)}>
+                  Descargar
+                </Button>
+              </div>
+            </div>
+            <pre className="mt-2 max-h-80 overflow-auto rounded-lg border border-line bg-bg-subtle p-3 font-mono text-[12px] leading-5 whitespace-pre-wrap text-fg-2">{RAG_TEMPLATE}</pre>
+            <p className="mt-2 text-xs text-fg-3">
+              Después de subir, usa <strong className="text-fg-2">Probar búsqueda</strong> con preguntas reales: si el fragmento correcto aparece primero, la IA responderá bien.
+            </p>
+          </section>
+        </div>
+      )}
+    </Card>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -128,7 +203,7 @@ function AddDocumentModal({ app, onClose, onSaved }: { app: Application; onClose
             ) : (
               <span className="text-sm text-fg-2">
                 Arrastra un archivo o <span className="text-accent-strong">elige uno</span>
-                <span className="mt-1 block text-xs text-fg-3">.pdf, .txt o .md · máx. 8 MB · PDF con texto (no escaneado)</span>
+                <span className="mt-1 block text-xs text-fg-3">.md (recomendado), .txt o .pdf · máx. 8 MB · PDF con texto (no escaneado)</span>
               </span>
             )}
             <input type="file" accept=".pdf,.txt,.md,.markdown" className="sr-only" onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
@@ -340,18 +415,21 @@ export default function KnowledgePage() {
       />
 
       {!apps.data?.length ? (
-        <Card>
-          <EmptyState
-            icon={<Library className="size-5" />}
-            title="Primero crea una aplicación"
-            description="Los documentos pertenecen a una aplicación (por ejemplo, DentalSoft)."
-            action={
-              <Link href="/applications/">
-                <Button variant="primary">Ir a Aplicaciones</Button>
-              </Link>
-            }
-          />
-        </Card>
+        <div className="space-y-4">
+          <Card>
+            <EmptyState
+              icon={<Library className="size-5" />}
+              title="Primero crea una aplicación"
+              description="Los documentos pertenecen a una aplicación (por ejemplo, DentalSoft)."
+              action={
+                <Link href="/applications/">
+                  <Button variant="primary">Ir a Aplicaciones</Button>
+                </Link>
+              }
+            />
+          </Card>
+          <RagGuide defaultOpen />
+        </div>
       ) : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
@@ -431,6 +509,8 @@ export default function KnowledgePage() {
           </Card>
 
           {app && !!app.document_count && <SearchTester app={app} />}
+
+          <RagGuide key={app?.id} defaultOpen={!!app && !app.document_count} />
 
           <p className="text-xs text-fg-3">
             Búsqueda de texto completo en español dentro de la base de datos: no usa memoria del servidor. Encuentra por palabras (ignora acentos y

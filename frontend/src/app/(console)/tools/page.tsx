@@ -582,7 +582,10 @@ export default function ToolsPage() {
         </p>
         <p>
           <strong className="text-fg-2">Consejo.</strong> El modelo actual es pequeño: funciona mejor con 2–3 herramientas por aplicación, con descripciones claras
-          y resultados cortos.
+          y resultados cortos.{" "}
+          <Link href="/docs/#tools" className="text-accent-strong hover:underline">
+            Ver guía completa
+          </Link>
         </p>
       </div>
 

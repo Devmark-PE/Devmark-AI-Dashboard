@@ -8,6 +8,7 @@ import { Button, Card, CopyButton, InlineError, Select, StatusBadge, Tag, Textar
 import { api, ApiError } from "@/lib/api";
 import { formatMs, formatNumber } from "@/lib/format";
 import { useResource } from "@/lib/hooks";
+import { downloadText, RAG_FORMATS, RAG_TEMPLATE, RAG_TIPS, TOOL_STEPS, TOOL_TIPS } from "@/lib/guides";
 import type { Application, ModelsResponse, PlatformSettings, PlaygroundResponse } from "@/lib/types";
 
 /* ------------------------------------------------------------------ */
@@ -567,9 +568,92 @@ export default function DocsPage() {
 }`}
             />
           </div>
+
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <Card className="p-5">
+              <h3 className="text-sm font-semibold text-fg">Cómo subir la información</h3>
+              <ul className="mt-3 space-y-2">
+                {RAG_FORMATS.map((f) => (
+                  <li key={f.format} className="flex items-start gap-2 text-[13px]">
+                    <Tag className={cx("shrink-0", f.rating === 3 && "border-good/30 text-good-text", f.rating === 1 && "border-warning/30")}>{"★".repeat(f.rating).padEnd(3, "☆")}</Tag>
+                    <span>
+                      <span className="font-medium text-fg">{f.format}</span> <span className="text-fg-3">— {f.note}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <h3 className="mt-5 text-sm font-semibold text-fg">Cómo escribirla</h3>
+              <ol className="mt-3 space-y-2">
+                {RAG_TIPS.map((t, i) => (
+                  <li key={t.title} className="flex gap-2 text-[13px]">
+                    <span className="grid size-5 shrink-0 place-items-center rounded-full bg-surface-3 text-[11px] font-semibold text-fg-2">{i + 1}</span>
+                    <span>
+                      <span className="font-medium text-fg">{t.title}.</span> <span className="text-fg-2">{t.text}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+            <div className="min-w-0 space-y-2">
+              <CodeBlock code={RAG_TEMPLATE} lang="bash" title="Plantilla recomendada (.md)" />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" onClick={() => downloadText("plantilla-conocimiento.md", RAG_TEMPLATE)}>
+                  Descargar plantilla
+                </Button>
+                <Link href="/knowledge/" className="inline-flex items-center gap-1 text-[13px] text-accent-strong hover:underline">
+                  Subir documentos <ArrowRight className="size-3" />
+                </Link>
+              </div>
+              <p className="text-xs text-fg-3">
+                La búsqueda es por palabras en español (ignora acentos y reconoce variaciones). Comprueba cada documento con «Probar búsqueda» usando preguntas reales.
+              </p>
+            </div>
+          </div>
         </Section>
 
         <Section id="tools" title="Herramientas" icon={Wrench} description="La IA consulta datos reales de tus sistemas (Supabase, APIs, páginas web) mientras responde.">
+          <ol className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {TOOL_STEPS.map((step, i) => (
+              <li key={step.title} className="relative rounded-xl border border-line bg-surface p-4">
+                <span className="grid size-7 place-items-center rounded-full bg-accent-soft text-xs font-semibold text-accent-strong">{i + 1}</span>
+                <h3 className="mt-3 text-sm font-semibold text-fg">{step.title}</h3>
+                <p className="mt-1 text-[13px] text-fg-2">{step.text}</p>
+                {i < TOOL_STEPS.length - 1 && <ArrowRight className="absolute top-1/2 -right-3 z-10 hidden size-4 -translate-y-1/2 text-fg-3 lg:block" aria-hidden />}
+              </li>
+            ))}
+          </ol>
+          <div className="mb-6 grid gap-4 lg:grid-cols-2">
+            <CodeBlock
+              lang="bash"
+              title="Ejemplo: herramienta «buscar_lead» (Supabase)"
+              code={`Nombre:      buscar_lead
+Descripción: Busca leads por nombre.
+             Devuelve ciudad, estado y teléfono.
+URL:         https://TU-PROYECTO.supabase.co
+             /rest/v1/leads
+             ?select=nombre,ciudad,estado,telefono
+             &nombre=ilike.*{nombre}*
+             &ciudad=eq.{ciudad}&limit=5
+Parámetros:  nombre (texto, obligatorio)
+             ciudad (texto, opcional)
+Cabecera:    apikey = key publishable/anon
+             (se guarda cifrada)`}
+            />
+            <Card className="p-5">
+              <h3 className="text-sm font-semibold text-fg">Consejos</h3>
+              <ul className="mt-3 space-y-2">
+                {TOOL_TIPS.map((tip) => (
+                  <li key={tip} className="flex gap-2 text-[13px] text-fg-2">
+                    <span className="mt-2 size-1 shrink-0 rounded-full bg-accent" aria-hidden />
+                    {tip}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-fg-3">
+                Si un parámetro opcional no llega (ej. ciudad), su filtro se quita solo de la URL.
+              </p>
+            </Card>
+          </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-3 text-sm text-fg-2">
               <p>
