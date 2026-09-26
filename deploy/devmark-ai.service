@@ -1,0 +1,16 @@
+[Unit]
+Description=Devmark AI API
+After=network.target ollama.service
+Requires=ollama.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/ai-server
+EnvironmentFile=/home/ubuntu/ai-server/.env
+ExecStart=/home/ubuntu/ai-server/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

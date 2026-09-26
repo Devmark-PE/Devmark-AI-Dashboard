@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+/* Dark es el modo principal. Light se activa con data-theme="light". */
+@custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
+
+:root {
+  color-scheme: dark;
+
+  --bg: #08090c;
+  --bg-subtle: #0c0d11;
+  --surface: #111318;
+  --surface-2: #161920;
+  --surface-3: #1c2029;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  --text: #f3f4f6;
+  --text-2: #a6abb8;
+  --text-3: #6d7382;
+
+  --accent: #8b7cff;
+  --accent-strong: #a397ff;
+  --accent-soft: rgba(139, 124, 255, 0.12);
+  --accent-ink: #0b0a1a;
+
+  /* Estados: siempre acompañados de icono + texto. */
+  --good: #0ca30c;
+  --good-text: #3ecf6b;
+  --warning: #fab219;
+  --critical: #d03b3b;
+  --critical-text: #ff7a7a;
+  --neutral: #6d7382;
+
+  /* Gráficos (validados contra --surface). */
+  --series-1: #3987e5;
+  --grid: #22252d;
+  --axis: #383b44;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f6f6f4;
+  --bg-subtle: #f1f1ee;
+  --surface: #ffffff;
+  --surface-2: #f7f7f5;
+  --surface-3: #efefec;
+  --border: rgba(11, 11, 11, 0.08);
+  --border-strong: rgba(11, 11, 11, 0.14);
+
+  --text: #0b0b0c;
+  --text-2: #52514e;
+  --text-3: #85847f;
+
+  --accent: #5b4bdb;
+  --accent-strong: #4a3aa7;
+  --accent-soft: rgba(91, 75, 219, 0.09);
+  --accent-ink: #ffffff;
+
+  --good-text: #006300;
+  --critical-text: #b42323;
+
+  --series-1: #2a78d6;
+  --grid: #ecebe7;
+  --axis: #c3c2b7;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-fg: var(--text);
+  --color-fg-2: var(--text-2);
+  --color-fg-3: var(--text-3);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-good: var(--good);
+  --color-good-text: var(--good-text);
+  --color-warning: var(--warning);
+  --color-critical: var(--critical);
+  --color-critical-text: var(--critical-text);
+  --color-series-1: var(--series-1);
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Fondo sutil de la marca detrás del contenido principal. */
+.brand-glow {
+  background:
+    radial-gradient(60rem 30rem at 85% -10%, rgba(139, 124, 255, 0.10), transparent 60%),
+    radial-gradient(40rem 24rem at -10% 110%, rgba(57, 135, 229, 0.06), transparent 60%);
+}
+:root[data-theme="light"] .brand-glow {
+  background: radial-gradient(60rem 30rem at 85% -10%, rgba(91, 75, 219, 0.06), transparent 60%);
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-in {
+  animation: fade-in 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in { animation: none; }
+}
