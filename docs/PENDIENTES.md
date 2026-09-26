@@ -16,31 +16,27 @@ Orden recomendado: de arriba a abajo. Marca `[x]` al terminar.
 - [x] Seguridad de Supabase revisada (contraseña y keys legacy).
 - [x] Nginx endurecido (`deploy/nginx/install.sh`; deshacer: `sudo bash deploy/nginx/rollback.sh`).
 - [x] Ollama ajustado para 2 GB (`deploy/ollama/install.sh`, contexto 2048).
+- [x] `API_KEY_PEPPER` respaldado fuera del servidor.
+- [x] Ubuntu actualizado y servidor reiniciado; `nginx`, `ollama` y `devmark-ai` activos.
 
 ---
 
-## 1. Guardar el pepper fuera del servidor 🔴
+## 1. Activar CORS para App-testeo-APIs 🟡
 
-**Dónde:** servidor (SSH). Copia el valor a tu gestor de contraseñas. No lo pegues en chats.
+1. GitHub: merge del PR #4 (dev → main).
+2. Servidor (SSH):
+   ```bash
+   cd ~/ai-server && git fetch -q origin main && git checkout -q -f -B main origin/main && sudo systemctl restart devmark-ai
+   ```
+3. Comprobar: el preflight devuelve `access-control-allow-origin: https://devmark-pe.github.io`
+   ```bash
+   curl -s -o /dev/null -D - -X OPTIONS https://ai.devmarkpe.com/v1/chat/completions \
+     -H "Origin: https://devmark-pe.github.io" -H "Access-Control-Request-Method: POST" \
+     -H "Access-Control-Request-Headers: authorization,content-type" | grep -i access-control
+   ```
+Otro dominio: `CORS_ALLOWED_ORIGINS=https://dominio-final.com` en `.env` y reiniciar `devmark-ai`.
 
-```bash
-grep ^API_KEY_PEPPER ~/ai-server/.env
-```
-
-Si se pierde, todas las API keys dejan de funcionar y habría que crearlas de nuevo.
-
-## 2. Actualizar Ubuntu 🟠
-
-**Dónde:** servidor (SSH). Hay ~139 actualizaciones de seguridad. Elige un momento con poco tráfico (reinicio de ~1 min).
-
-```bash
-sudo apt update && sudo apt -y upgrade
-[ -f /var/run/reboot-required ] && sudo reboot
-```
-
-**Comprobar** (tras reconectar por SSH): `systemctl is-active nginx ollama devmark-ai` → `active` ×3.
-
-## 3. Restringir SSH en AWS 🟠
+## 2. Restringir SSH en AWS 🟠 (seguridad, no bloquea el funcionamiento)
 
 **Dónde:** consola AWS → EC2 → Security Groups → Inbound rules.
 
@@ -48,7 +44,7 @@ sudo apt update && sudo apt -y upgrade
 - Deja 80 y 443 abiertos a `0.0.0.0/0`. No abras 8000, 11434 ni 5432.
 - Si tu IP cambia y pierdes acceso: EC2 → Connect → *EC2 Instance Connect* o *Session Manager* y actualiza la regla.
 
-## 4. Migrar tus apps a keys nuevas y retirar la key antigua 🟡
+## 3. Migrar tus apps a keys nuevas y retirar la key antigua 🟡
 
 1. En el dashboard → API Keys, crea una key por aplicación.
 2. En cada app, reemplaza el valor de la key antigua por la nueva `dmk_live_…` (en su `.env`, nunca en el frontend).
@@ -58,7 +54,7 @@ sudo apt update && sudo apt -y upgrade
    echo "LEGACY_API_KEY_ENABLED=false" >> ~/ai-server/.env && sudo systemctl restart devmark-ai
    ```
 
-## 5. Proteger `/chat` 🟡
+## 4. Proteger `/chat` 🟡
 
 **Comprobar si alguien lo usa** (dashboard → Logs → filtro endpoint `/chat`, o SSH):
 ```bash
@@ -70,13 +66,13 @@ echo "CHAT_REQUIRE_API_KEY=true" >> ~/ai-server/.env && sudo systemctl restart d
 ```
 **Comprobar:** `curl -s -X POST https://ai.devmarkpe.com/chat -H 'Content-Type: application/json' -d '{"message":"hola"}'` → `{"detail":"API key requerida"}`.
 
-## 6. Decisiones pendientes 🔵
+## 5. Decisiones pendientes 🔵
 
 - **RAM**: seguir en t4g.small (2 GB) o subir a t4g.medium (4 GB, ~12 USD/mes más).
   Antes de cambiar el tipo de instancia hay que asignar una **Elastic IP** a `34.204.181.237` (EC2 → Elastic IPs); si no, la IP cambia y el DNS deja de apuntar.
 - **Supabase plan gratuito**: se pausa tras 7 días sin actividad. Si la API recibe tráfico a diario no pasa; si se pausa, reactívalo desde la consola.
 
-## 7. Flujo de trabajo con ramas
+## 6. Flujo de trabajo con ramas
 
 - Se trabaja en **`dev`**. Para publicar: GitHub → *Pull requests* → *New* → base `main` ← compare `dev` → *Create* → *Merge*.
 - Después del merge, actualiza el servidor con el comando de `docs/ARQUITECTURA.md` §9.
