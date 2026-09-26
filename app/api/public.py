@@ -14,12 +14,14 @@ import uuid
 from typing import Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Header, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from app.api.deps import authenticate, client_ip
 from app.config import get_settings
-from app.services import ollama
+from app.database import session_scope
+from app.services import ollama, rag
 from app.services.api_keys import KeyContext
 from app.services.request_log import RequestLogEntry, write_log
 
@@ -57,6 +59,8 @@ class OpenAIChatRequest(BaseModel):
     top_p: float | None = Field(default=None, ge=0, le=1)
     max_tokens: int | None = Field(default=None, ge=1, le=8192)
     stop: str | list[str] | None = None
+    # Extensión Devmark: forzar (true) o desactivar (false) el RAG de la aplicación. Por defecto, lo que diga la aplicación.
+    rag: bool | None = None
 
 
 # --------------------------------------------------------------------------
@@ -120,6 +124,23 @@ def _log(
     )
 
 
+def _rag_lookup(application_id, query: str, top_k: int) -> list[rag.SearchResult]:
+    with session_scope() as db:
+        return rag.search(db, application_id, query, top_k)
+
+
+async def retrieve(context: KeyContext | None, messages: list[dict[str, str]], force: bool | None) -> list[rag.SearchResult]:
+    """Fragmentos de la aplicación relevantes para el último mensaje del usuario ([] si no aplica)."""
+    enabled = context is not None and context.application_id is not None and (force if force is not None else context.rag_enabled)
+    query = rag.last_user_message(messages)
+    if not enabled or not query or not get_settings().database_enabled:
+        return []
+    try:
+        return await run_in_threadpool(_rag_lookup, context.application_id, query, context.rag_top_k)
+    except Exception:  # noqa: BLE001 - si la búsqueda falla, se responde sin contexto
+        return []
+
+
 def _messages_text(messages: list[dict[str, str]]) -> str:
     return "\n".join(f"{m['role']}: {m['content']}" for m in messages)
 
@@ -178,6 +199,9 @@ async def openai_chat(
     if invalid is not None:
         return invalid
 
+    sources = await retrieve(context, messages, body.rag)
+    messages = rag.augment_messages(messages, sources)
+
     options: dict[str, Any] = {}
     if body.temperature is not None:
         options["temperature"] = body.temperature
@@ -224,6 +248,7 @@ async def openai_chat(
                 "total_tokens": prompt_tokens + completion_tokens,
             },
             "processing_time": round(time.time() - start_time, 2),
+            **({"rag": {"sources": [s.as_dict(include_content=False) for s in sources]}} if sources else {}),
         },
         background=background,
     )

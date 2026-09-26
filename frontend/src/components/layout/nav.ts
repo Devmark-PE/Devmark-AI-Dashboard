@@ -1,4 +1,4 @@
-import { Activity, AppWindow, BarChart3, BookOpen, Boxes, KeyRound, LayoutDashboard, ScrollText, Settings } from "lucide-react";
+import { Activity, AppWindow, BarChart3, BookOpen, Boxes, FlaskConical, KeyRound, LayoutDashboard, Library, ScrollText, Settings } from "lucide-react";
 
 export const NAV = [
   {
@@ -8,6 +8,8 @@ export const NAV = [
       { href: "/api-keys/", label: "API Keys", icon: KeyRound },
       { href: "/applications/", label: "Aplicaciones", icon: AppWindow },
       { href: "/models/", label: "Modelos", icon: Boxes },
+      { href: "/knowledge/", label: "Conocimiento (RAG)", icon: Library },
+      { href: "/playground/", label: "Playground", icon: FlaskConical },
     ],
   },
   {

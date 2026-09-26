@@ -1,0 +1,9 @@
+[Unit]
+Description=Devmark AI - despliegue automático desde main
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/devmark-deploy
+TimeoutStartSec=600

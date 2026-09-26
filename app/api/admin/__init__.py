@@ -7,11 +7,13 @@ from app.api.admin import (
     logs,
     models,
     overview,
+    playground,
+    rag,
     settings,
     system,
     usage,
 )
 
 router = APIRouter(prefix="/api/admin")
-for module in (auth, overview, applications, keys, logs, usage, models, system, settings):
+for module in (auth, overview, applications, keys, logs, usage, models, system, settings, rag, playground):
     router.include_router(module.router)

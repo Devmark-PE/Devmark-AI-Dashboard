@@ -41,6 +41,8 @@ class KeyContext:
     permissions: list[str] = field(default_factory=lambda: list(PERMISSIONS))
     rate_limit_rpm: int | None = None
     app_rate_limit_rpm: int | None = None
+    rag_enabled: bool = False
+    rag_top_k: int = 3
 
     @property
     def is_legacy(self) -> bool:
@@ -123,6 +125,8 @@ def resolve_platform_key(db: Session, raw_key: str, settings: Settings) -> KeyCo
         permissions=list(key.permissions or []),
         rate_limit_rpm=key.rate_limit_rpm,
         app_rate_limit_rpm=app.rate_limit_rpm,
+        rag_enabled=bool(app.rag_enabled),
+        rag_top_k=app.rag_top_k or 3,
     )
 
 

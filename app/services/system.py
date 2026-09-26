@@ -149,6 +149,21 @@ def host_metrics() -> dict:
     return metrics
 
 
+def check_rag() -> dict:
+    engine = get_engine()
+    if engine is None:
+        return _check("rag", "RAG", "not_configured", "Requiere base de datos")
+    try:
+        from app.database import session_scope
+        from app.services import rag
+
+        with session_scope() as db:
+            documents, chunks = rag.stats(db)
+    except Exception as exc:  # noqa: BLE001
+        return _check("rag", "RAG", "offline", type(exc).__name__)
+    return _check("rag", "RAG", "online", f"Texto completo (español) · {documents} documentos · {chunks} fragmentos")
+
+
 async def full_status(request: Request) -> dict:
     (ollama_check, model_check, ollama_version), https_check, db_check, nginx_check = await asyncio.gather(
         check_ollama(),
@@ -156,6 +171,7 @@ async def full_status(request: Request) -> dict:
         asyncio.to_thread(check_database),
         check_nginx(request),
     )
+    rag_check = await asyncio.to_thread(check_rag)
     checks = [
         _check("api", "API Gateway", "online", "FastAPI respondiendo"),
         nginx_check,
@@ -163,7 +179,7 @@ async def full_status(request: Request) -> dict:
         ollama_check,
         model_check,
         db_check,
-        _check("rag", "RAG", "not_configured", "Pendiente (PostgreSQL + pgvector)"),
+        rag_check,
         _check("tools", "Tools", "not_configured", "Pendiente (function calling)"),
     ]
     return {

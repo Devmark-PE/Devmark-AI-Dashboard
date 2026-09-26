@@ -65,6 +65,14 @@
   --axis: #c3c2b7;
 }
 
+/* Fuente de marca: Braze (DawnCreative). Coloca el archivo con licencia de uso web en
+   frontend/public/fonts/Braze.woff2 (o .otf). Si no existe, se usa la fuente de la interfaz. */
+@font-face {
+  font-family: "Braze";
+  src: url("/dashboard/fonts/Braze.woff2") format("woff2"), url("/dashboard/fonts/Braze.otf") format("opentype");
+  font-display: swap;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-bg-subtle: var(--bg-subtle);
@@ -88,6 +96,7 @@
   --color-series-1: var(--series-1);
   --font-sans: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+  --font-brand: "Braze", var(--font-geist-sans), system-ui, sans-serif;
 }
 
 html,
