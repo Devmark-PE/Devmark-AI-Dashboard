@@ -27,19 +27,16 @@ Orden recomendado: de arriba a abajo. Marca `[x]` al terminar.
 - [x] Correo configurado (Titan, `ai@devmarkpe.com`): recuperación de contraseña y avisos de seguridad con diseño DEVMARK.
 - [x] SSH restringido en AWS (`sg-00a716674b16980a2`): puerto 22 solo desde la IP de casa + lista `ec2-instance-connect`
   (`pl-0e4bcff02b13bef1e`) para entrar desde el navegador. Si cambia tu IP: regla SSH → Origen → **Mi IP** → Guardar.
+- [x] Keys de prueba eliminadas; las apps nuevas usarán keys `dmk_…` por aplicación.
 - [x] CORS activo para App-testeo-APIs (`https://devmark-pe.github.io`, solo `/v1/models` y `/v1/chat/completions`; otro dominio: `CORS_ALLOWED_ORIGINS` en `.env`).
 
 ---
 
-## 1. Migrar tus apps a keys nuevas y retirar la key antigua 🟡
+## 1. Al conectar una app nueva 🟢
 
-1. En el dashboard → API Keys, crea una key por aplicación.
-2. En cada app, reemplaza el valor de la key antigua por la nueva `dmk_live_…` (en su `.env`, nunca en el frontend).
-3. Verifica en **Logs** que cada app aparece con su nombre (y ya no «Key heredada (.env)»).
-4. Cuando ninguna petición use la key antigua durante unos días (servidor, SSH):
-   ```bash
-   echo "LEGACY_API_KEY_ENABLED=false" >> ~/ai-server/.env && sudo systemctl restart devmark-ai
-   ```
+1. Dashboard → **Aplicaciones** → crea la app → **API Keys** → crea su key (`dmk_live_…`; `dmk_test_…` para pruebas).
+2. Guarda la key en el backend de la app (su `.env`), nunca en el frontend.
+3. Comprueba en **Logs** que las peticiones aparecen con el nombre de la app.
 
 ## 2. A tener en cuenta 🔵
 
