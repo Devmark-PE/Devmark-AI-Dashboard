@@ -1,4 +1,10 @@
 # Fuente de marca
 
-Coloca aquí `Braze.woff2` (recomendado) o `Braze.otf` — fuente **Braze** de DawnCreative — para el nombre DEVMARK.
-Verifica que la licencia permita uso web/comercial. Luego: `npm run export:app` y commit.
+`Braze.woff2`: fuente **Braze** (BrandEarth / DawnCreative) reducida a las mayúsculas A–Z, solo para el nombre DEVMARK.
+Se generó desde el TTF original con:
+
+```bash
+pyftsubset Braze.ttf --text="ABCDEFGHIJKLMNOPQRSTUVWXYZ " --flavor=woff2 --output-file=Braze.woff2 --layout-features=kern --name-IDs='*'
+```
+
+El archivo completo no se sube al repositorio (es público). Uso sujeto a la licencia BrandEarth.
