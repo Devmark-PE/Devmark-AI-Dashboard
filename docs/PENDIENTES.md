@@ -13,6 +13,9 @@ Orden recomendado: de arriba a abajo. Marca `[x]` al terminar.
 - [x] Supabase conectado (`DATABASE_URL`, `API_KEY_PEPPER` en `.env`), tablas creadas y protegidas (migración 0002).
 - [x] Usuario administrador creado; login al dashboard funcionando.
 - [x] Primera aplicación y API key creadas y probadas.
+- [x] Seguridad de Supabase revisada (contraseña y keys legacy).
+- [x] Nginx endurecido (`deploy/nginx/install.sh`).
+- [x] Ollama ajustado para 2 GB (`deploy/ollama/install.sh`, contexto 2048).
 
 ---
 
@@ -26,22 +29,7 @@ grep ^API_KEY_PEPPER ~/ai-server/.env
 
 Si se pierde, todas las API keys dejan de funcionar y habría que crearlas de nuevo.
 
-## 2. Seguridad de Supabase 🔴
-
-**Dónde:** consola web de Supabase. La contraseña de la base y la key `service_role` se compartieron en un chat.
-
-1. Project Settings → API Keys → **Legacy API keys** → *Disable* (Devmark AI no las usa).
-2. Project Settings → Database → **Reset database password** → guárdala en tu gestor.
-3. Actualiza el servidor con la nueva contraseña (SSH):
-   ```bash
-   cd ~/ai-server && venv/bin/python -m app.cli setup-env --replace
-   sudo systemctl restart devmark-ai && venv/bin/python -m app.cli check-db
-   ```
-   En «Host» puedes pegar la cadena completa `postgresql://postgres.…@aws-0-us-east-1.pooler.supabase.com:5432/postgres`.
-
-**Comprobar:** `check-db` muestra `OK: PostgreSQL 17…` y el dashboard sigue funcionando.
-
-## 3. Endurecer Nginx (Etapa 1) 🟠
+## 2. Endurecer Nginx (Etapa 1) 🟠
 
 **Dónde:** servidor (SSH). Hace respaldo de `/etc/nginx`, aplica, valida y **se restaura solo si algo falla**.
 
@@ -65,7 +53,7 @@ Esperado: `/ 200`, `/health 200`, `/docs 404`, `/dashboard/ 200`, headers presen
 > Si una app tuya llama a la API desde un servidor con muchos usuarios (todos salen por la misma IP) y ves
 > errores 429, sube el límite en `deploy/nginx/devmark-limits.conf` (`rate=20r/m`) y vuelve a instalar.
 
-## 4. Ajustar Ollama para 2 GB 🟠
+## 3. Ajustar Ollama para 2 GB 🟠
 
 **Dónde:** servidor (SSH). Un modelo cargado, una generación a la vez, modelo siempre en memoria (sin arranques en frío de ~30 s). No cambia el modelo.
 
@@ -80,7 +68,7 @@ cd ~/ai-server && sudo bash deploy/ollama/install.sh
 sudo rm /etc/systemd/system/ollama.service.d/devmark.conf && sudo systemctl daemon-reload && sudo systemctl restart ollama
 ```
 
-## 5. Actualizar Ubuntu 🟠
+## 4. Actualizar Ubuntu 🟠
 
 **Dónde:** servidor (SSH). Hay ~139 actualizaciones de seguridad. Elige un momento con poco tráfico (reinicio de ~1 min).
 
@@ -91,7 +79,7 @@ sudo apt update && sudo apt -y upgrade
 
 **Comprobar** (tras reconectar por SSH): `systemctl is-active nginx ollama devmark-ai` → `active` ×3.
 
-## 6. Restringir SSH en AWS 🟠
+## 5. Restringir SSH en AWS 🟠
 
 **Dónde:** consola AWS → EC2 → Security Groups → Inbound rules.
 
@@ -99,7 +87,7 @@ sudo apt update && sudo apt -y upgrade
 - Deja 80 y 443 abiertos a `0.0.0.0/0`. No abras 8000, 11434 ni 5432.
 - Si tu IP cambia y pierdes acceso: EC2 → Connect → *EC2 Instance Connect* o *Session Manager* y actualiza la regla.
 
-## 7. Migrar tus apps a keys nuevas y retirar la key antigua 🟡
+## 6. Migrar tus apps a keys nuevas y retirar la key antigua 🟡
 
 1. En el dashboard → API Keys, crea una key por aplicación.
 2. En cada app, reemplaza el valor de la key antigua por la nueva `dmk_live_…` (en su `.env`, nunca en el frontend).
@@ -109,7 +97,7 @@ sudo apt update && sudo apt -y upgrade
    echo "LEGACY_API_KEY_ENABLED=false" >> ~/ai-server/.env && sudo systemctl restart devmark-ai
    ```
 
-## 8. Proteger `/chat` 🟡
+## 7. Proteger `/chat` 🟡
 
 **Comprobar si alguien lo usa** (dashboard → Logs → filtro endpoint `/chat`, o SSH):
 ```bash
@@ -121,13 +109,13 @@ echo "CHAT_REQUIRE_API_KEY=true" >> ~/ai-server/.env && sudo systemctl restart d
 ```
 **Comprobar:** `curl -s -X POST https://ai.devmarkpe.com/chat -H 'Content-Type: application/json' -d '{"message":"hola"}'` → `{"detail":"API key requerida"}`.
 
-## 9. Decisiones pendientes 🔵
+## 8. Decisiones pendientes 🔵
 
 - **RAM**: seguir en t4g.small (2 GB) o subir a t4g.medium (4 GB, ~12 USD/mes más).
   Antes de cambiar el tipo de instancia hay que asignar una **Elastic IP** a `34.204.181.237` (EC2 → Elastic IPs); si no, la IP cambia y el DNS deja de apuntar.
 - **Supabase plan gratuito**: se pausa tras 7 días sin actividad. Si la API recibe tráfico a diario no pasa; si se pausa, reactívalo desde la consola.
 
-## 10. Flujo de trabajo con ramas
+## 9. Flujo de trabajo con ramas
 
 - Se trabaja en **`dev`**. Para publicar: GitHub → *Pull requests* → *New* → base `main` ← compare `dev` → *Create* → *Merge*.
 - Después del merge, actualiza el servidor con el comando de `docs/ARQUITECTURA.md` §9.
