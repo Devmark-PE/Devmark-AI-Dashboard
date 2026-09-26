@@ -65,7 +65,14 @@ Errores: `401` key inválida/revocada/expirada · `403` sin permiso o app deshab
 ## 5. Dashboard y seguridad del administrador
 
 - Usuarios propios en la tabla `users` (contraseña con **scrypt**). Se crean por CLI: `python -m app.cli create-admin`.
-- Login → cookie `dmk_session` (`HttpOnly`, `Secure`, `SameSite=Strict`, 12 h). En la base solo se guarda el hash del token.
+- Login → cookie `dmk_session` (`HttpOnly`, `Secure`, `SameSite=Strict`, 12 h; con «Mantener sesión iniciada», 30 días).
+  En la base solo se guarda el hash del token. El navegador puede guardar la contraseña (campos con `autocomplete` correcto).
+- **Verificación en dos pasos (TOTP)**, opcional por usuario (Configuración): códigos de 6 dígitos de cualquier app
+  autenticadora, con protección contra reutilización del mismo código, y 10 **códigos de recuperación** de un solo uso
+  (solo se guarda su hash). Con 2FA activo, el login devuelve un token temporal firmado (5 min) y la sesión se crea
+  solo tras el código. Desactivar 2FA o regenerar códigos exige contraseña + código.
+- **Recuperar contraseña**: con SMTP configurado se envía un enlace de un solo uso (30 min, solo hash en la base);
+  al usarlo se cierran todas las sesiones. La respuesta es igual exista o no el email. Sin SMTP: `app.cli reset-password`.
 - Cada acción que modifica datos exige la cabecera `X-CSRF-Token` de la sesión.
 - Bloqueo tras 5 intentos fallidos (15 min, en la app) + límite de Nginx en `/api/admin/auth/login`.
 - Una API key **no** da acceso al dashboard.
@@ -78,11 +85,12 @@ Errores: `401` key inválida/revocada/expirada · `403` sin permiso o app deshab
 | `admin_sessions` | Sesiones activas (hash del token, CSRF, IP, navegador) |
 | `applications` | Apps cliente (`rate_limit_rpm`, `monthly_token_quota` preparados) |
 | `api_keys` | Hash + prefijo, permisos, estado, expiración, último uso, `rate_limit_rpm` |
+| `password_reset_tokens` | Enlaces de recuperación (hash, expiración, uso) |
 | `api_request_logs` | Una fila por request: app, key, endpoint, modelo, tokens, tiempo, estado, error |
 | `rag_documents` | Documentos de conocimiento por aplicación (título, tipo, tamaño, nº de fragmentos) |
 | `rag_chunks` | Fragmentos indexados (índice FTS en español) |
 
-- Migraciones con **Alembic** (`migrations/`). `0003` crea las tablas RAG. `0002` y `0003` activan RLS y revoca `anon`/`authenticated`: la API REST pública de Supabase no puede leer estas tablas.
+- Migraciones con **Alembic** (`migrations/`). `0003` crea las tablas RAG, `0004` la 2FA y la recuperación de contraseña. `0002`–`0004` activan RLS y revoca `anon`/`authenticated`: la API REST pública de Supabase no puede leer estas tablas.
 - Conexión por **Session pooler** (IPv4) con `sslmode=require`. El backend no usa ninguna key de Supabase.
 
 ## 7. Conocimiento (RAG) y Playground
@@ -125,15 +133,15 @@ app/
   database.py        SQLAlchemy + fechas UTC
   api/public.py      endpoints públicos (contrato original)
   api/deps.py        autenticación por API key y por sesión
-  api/admin/         auth, applications, keys, logs, usage, models, system, settings, overview
-  services/          ollama, api_keys, passwords, sessions, rate_limit, request_log, stats, system
+  api/admin/         auth (login, 2FA, recuperación), applications, keys, logs, usage, models, system, settings, rag, playground
+  services/          ollama, api_keys, passwords, sessions, totp, mailer, rag, rate_limit, request_log, stats, system
   models/            tablas
   schemas/           validación del API de administración
   cli.py             setup-env, check-db, create-admin, reset-password, list-admins
   static/dashboard/  build del frontend (generado con npm run export:app)
 frontend/            código fuente del dashboard (Next.js + TypeScript + Tailwind)
 migrations/          Alembic
-deploy/              servicio systemd, DEPLOY.md, nginx/ (Etapa 1), ollama/ (ajustes)
+deploy/              servicio systemd, DEPLOY.md, nginx/, ollama/ (ajustes), auto-deploy/ (despliegue desde main)
 docs/                esta documentación y PENDIENTES.md
 tests/               pytest (API pública, keys, admin, CLI)
 ```
@@ -148,7 +156,16 @@ dev   ── aquí se trabaja (Claude, OpenCode, tú). Cada cambio llega por com
 main  ─────────────────┴── lo que está en producción. El servidor sigue esta rama.
 ```
 
-Actualizar producción después de un merge a `main` (servidor, SSH):
+**Despliegue automático** (`deploy/auto-deploy/`, se instala una vez con `sudo bash deploy/auto-deploy/install.sh`):
+un timer de systemd revisa `main` cada 2 minutos. Si hay commits nuevos: `git checkout`, `pip install` (solo si cambió
+`requirements.txt`), `alembic upgrade head` (solo si cambió `migrations/`), reinicia `devmark-ai` y comprueba que responde.
+Si no responde en 60 s vuelve a la versión anterior y no reintenta ese commit. También reaplica Nginx/Ollama si cambiaron
+sus archivos. Es *pull*: GitHub no necesita llaves SSH del servidor ni puertos abiertos. Registro: `journalctl -u devmark-deploy`.
+
+**CI** (`.github/workflows/ci.yml`): en cada push/PR ejecuta ruff, pytest (SQLite y PostgreSQL 16), migraciones
+arriba/abajo, `tsc` y el build del dashboard.
+
+Actualizar producción a mano (si el despliegue automático no está instalado):
 
 ```bash
 cd ~/ai-server && git fetch -q origin main && git checkout -q -f -B main origin/main \
@@ -160,7 +177,6 @@ Si cambias el frontend: `cd frontend && npm run export:app` y commitea `app/stat
 
 ## 11. Preparado para lo siguiente
 
-- **Cuotas**: `monthly_token_quota` por aplicación ya existe en la tabla; falta aplicarla en `authenticate`.
 - **Rate limit distribuido**: `app/services/rate_limit.py` es en memoria (un worker); se reemplaza por Postgres/Redis sin tocar endpoints.
 - **RAG semántico**: añadir embeddings con pgvector a `rag_chunks` (hoy: texto completo en español).
 - **Tools / function calling**: tabla `tools` por aplicación y ejecución en `app/services/`.

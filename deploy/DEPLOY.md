@@ -126,6 +126,16 @@ echo "LEGACY_API_KEY_ENABLED=false" >> ~/ai-server/.env && sudo systemctl restar
 
 ## Actualizar a una versión nueva
 
+**Automático (recomendado):** instala una vez el despliegue automático y cada merge a `main` se publica solo en ~2 min
+(ver `deploy/auto-deploy/` y `docs/ARQUITECTURA.md` §10):
+
+```bash
+cd ~/ai-server && sudo bash deploy/auto-deploy/install.sh
+journalctl -u devmark-deploy -n 30 --no-pager      # ver los últimos despliegues
+```
+
+**Manual:**
+
 ```bash
 cd ~/ai-server && git fetch -q origin main && git checkout -f -B main origin/main \
   && venv/bin/pip install -q -r requirements.txt && venv/bin/alembic upgrade head && sudo systemctl restart devmark-ai

@@ -11,6 +11,7 @@ APP_USER="${APP_USER:-ubuntu}"
 BRANCH="${BRANCH:-main}"
 SERVICE="${SERVICE:-devmark-ai}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8000/}"
+STATE_DIR="${STATE_DIR:-/var/lib/devmark-deploy}"
 
 exec 9>/run/devmark-deploy.lock
 flock -n 9 || { echo "Otro despliegue en curso"; exit 0; }
@@ -22,6 +23,12 @@ as_app git fetch -q origin "$BRANCH"
 OLD=$(as_app git rev-parse HEAD)
 NEW=$(as_app git rev-parse "origin/$BRANCH")
 [ "$OLD" = "$NEW" ] && exit 0
+
+# Un commit que ya falló no se reintenta: se espera al siguiente commit en main.
+mkdir -p "$STATE_DIR"
+if [ "$(cat "$STATE_DIR/failed" 2>/dev/null)" = "$NEW" ]; then
+  exit 0
+fi
 
 echo "Nueva versión en $BRANCH: ${OLD:0:7} -> ${NEW:0:7}"
 CHANGED=$(as_app git diff --name-only "$OLD" "$NEW")
@@ -36,8 +43,9 @@ healthy() {
 
 rollback() {
   echo "ERROR: la nueva versión no responde. Volviendo a ${OLD:0:7}…"
+  echo "$NEW" > "$STATE_DIR/failed"
   as_app git checkout -q -f -B "$BRANCH" "$OLD"
-  systemctl restart "$SERVICE"
+  systemctl restart "$SERVICE" 9>&-
   healthy && echo "Rollback OK: ${OLD:0:7} en servicio" || echo "ATENCIÓN: el rollback tampoco responde; revisa journalctl -u $SERVICE"
   exit 1
 }
@@ -52,15 +60,20 @@ if grep -q '^migrations/' <<<"$CHANGED"; then
   as_app venv/bin/alembic upgrade head || rollback
 fi
 
-systemctl restart "$SERVICE"
+systemctl restart "$SERVICE" 9>&-
 healthy || rollback
+rm -f "$STATE_DIR/failed"
 echo "Desplegado ${NEW:0:7}: $(as_app git log -1 --format=%s)"
 
 if grep -q '^deploy/nginx/' <<<"$CHANGED"; then
   echo "Actualizando Nginx…"
-  bash deploy/nginx/install.sh || echo "Nginx no se actualizó (install.sh restauró la configuración anterior)"
+  bash deploy/nginx/install.sh 9>&- || echo "Nginx no se actualizó (install.sh restauró la configuración anterior)"
 fi
 if grep -q '^deploy/ollama/' <<<"$CHANGED"; then
   echo "Actualizando ajustes de Ollama…"
-  bash deploy/ollama/install.sh || echo "No se pudieron aplicar los ajustes de Ollama"
+  bash deploy/ollama/install.sh 9>&- || echo "No se pudieron aplicar los ajustes de Ollama"
+fi
+if grep -q '^deploy/auto-deploy/' <<<"$CHANGED"; then
+  echo "Actualizando el propio despliegue automático…"
+  bash deploy/auto-deploy/install.sh 9>&- >/dev/null || echo "No se pudo actualizar devmark-deploy"
 fi

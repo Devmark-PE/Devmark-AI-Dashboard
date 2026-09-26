@@ -24,20 +24,43 @@ Orden recomendado: de arriba a abajo. Marca `[x]` al terminar.
 
 ---
 
-## 1. Desplegar RAG y Playground 🟢
+## 1. Desplegar esta versión (RAG, Playground, 2FA, recuperación, docs) 🟢
 
-Tras el merge del PR a `main` (servidor, SSH):
+Tras el merge del PR `dev → main` (servidor, SSH), **una sola vez** a mano:
 
 ```bash
 cd ~/ai-server && git fetch -q origin main && git checkout -q -f -B main origin/main \
   && venv/bin/pip install -q -r requirements.txt && venv/bin/alembic upgrade head \
   && sudo systemctl restart devmark-ai
-sudo bash deploy/nginx/install.sh    # permite subir PDFs de hasta 8 MB en /api/admin/rag/
-venv/bin/alembic current             # debe mostrar 0003 (head)
+venv/bin/alembic current               # debe mostrar 0004 (head)
+sudo bash deploy/nginx/install.sh      # permite subir PDFs de hasta 8 MB en /api/admin/rag/
+sudo bash deploy/auto-deploy/install.sh   # desde ahora, cada merge a main se despliega solo
 ```
 
-Luego en el dashboard: **Conocimiento (RAG)** → elige la aplicación → *Añadir documento* → *Probar búsqueda* → *Activar RAG*.
-Pruébalo en **Playground** con «Usar documentos de la aplicación».
+Comprobar el despliegue automático: `systemctl list-timers devmark-deploy.timer` y
+`journalctl -u devmark-deploy -n 30 --no-pager` (tras el próximo merge debe decir «Desplegado …»).
+
+Luego en el dashboard:
+- **Configuración → Verificación en dos pasos → Activar 2FA**: escanea el QR con Google Authenticator / Authy /
+  1Password y **guarda los 10 códigos de recuperación** fuera del servidor.
+- **Conocimiento (RAG)** → elige la aplicación → *Añadir documento* → *Probar búsqueda* → *Activar RAG*.
+
+## 1b. Recuperar contraseña por email (opcional) 🟡
+
+Sin correo configurado, «¿Olvidaste tu contraseña?» muestra el comando de rescate
+(`venv/bin/python -m app.cli reset-password`). Para que envíe un enlace por email, añade al `.env` del servidor
+(ver `.env.example`; con Gmail usa una *contraseña de aplicación*, no tu contraseña normal):
+
+```bash
+nano ~/ai-server/.env      # SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
+sudo systemctl restart devmark-ai
+```
+
+## 1c. Fuente de marca Braze 🟡
+
+El nombre **DEVMARK** usa la fuente *Braze* (DawnCreative). No se incluye en el repo (licencia).
+Si tu licencia permite uso web, copia `Braze.woff2` (o `Braze.otf`) en `frontend/public/fonts/`, ejecuta
+`cd frontend && npm run export:app` y haz commit. Mientras no esté, se muestra con la fuente de la interfaz.
 
 ## 2. Restringir SSH en AWS 🟠 (seguridad, no bloquea el funcionamiento)
 
@@ -65,5 +88,7 @@ Pruébalo en **Playground** con «Usar documentos de la aplicación».
 ## 5. Flujo de trabajo con ramas
 
 - Se trabaja en **`dev`**. Para publicar: GitHub → *Pull requests* → *New* → base `main` ← compare `dev` → *Create* → *Merge*.
-- Después del merge, actualiza el servidor con el comando de `docs/ARQUITECTURA.md` §9.
+- Después del merge, el servidor se actualiza solo en ~2 min (despliegue automático). Si una versión no arranca,
+  vuelve sola a la anterior y no la reintenta hasta el siguiente commit.
+- GitHub Actions (CI) comprueba cada push y PR: tests, migraciones y build del dashboard. Mergea solo con ✅.
 - Nunca se sube `.env`, llaves `.pem` ni contraseñas al repositorio (el repo es **público**).

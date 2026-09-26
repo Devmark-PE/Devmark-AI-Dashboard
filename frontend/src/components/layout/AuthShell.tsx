@@ -1,7 +1,7 @@
 import { BookOpen, KeyRound, Lock, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { LogoMark } from "./Logo";
+import { LogoMark, Wordmark } from "./Logo";
 
 const FEATURES = [
   { icon: KeyRound, title: "API compatible con OpenAI", text: "Keys por aplicación, hash seguro y revocación inmediata." },
@@ -29,9 +29,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
         />
         <div className="relative flex items-center gap-3">
           <LogoMark className="size-9" />
-          <span className="text-lg font-semibold tracking-tight text-fg">
-            DEV<span className="text-fg-2">mark</span> <span className="rounded-md bg-accent-soft px-1.5 py-0.5 text-xs font-semibold text-accent-strong">AI</span>
-          </span>
+          <Wordmark className="text-xl" />
         </div>
         <div className="relative max-w-md">
           <h1 className="text-4xl leading-tight font-semibold tracking-tight text-fg">
@@ -60,9 +58,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
         <div className="w-full max-w-[380px]">
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
             <LogoMark className="size-8" />
-            <span className="font-semibold tracking-tight text-fg">
-              DEV<span className="text-fg-2">mark</span> AI
-            </span>
+            <Wordmark className="text-lg" />
           </div>
           {children}
         </div>

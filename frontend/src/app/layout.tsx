@@ -9,7 +9,7 @@ import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Devmark AI", template: "%s · Devmark AI" },
+  title: { default: "DEVMARK AI", template: "%s · DEVMARK AI" },
   description: "Plataforma privada de IA: modelos, API keys, aplicaciones, uso y logs.",
   robots: { index: false, follow: false },
   icons: { icon: "/dashboard/favicon.svg" },

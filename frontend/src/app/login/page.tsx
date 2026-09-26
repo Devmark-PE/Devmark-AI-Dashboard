@@ -116,7 +116,7 @@ export default function LoginPage() {
     <AuthShell>
       {step === "credentials" && (
         <>
-          <AuthHeading title="Iniciar sesión" description="Consola de administración de Devmark AI." />
+          <AuthHeading title="Iniciar sesión" description="Consola de administración de DEVMARK AI." />
           <form ref={formRef} onSubmit={submitCredentials} method="post" action="#" className="space-y-4" autoComplete="on">
             <Field label="Email">
               {(id) => (

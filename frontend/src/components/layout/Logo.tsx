@@ -20,16 +20,23 @@ export function LogoMark({ className = "size-7" }: { className?: string }) {
   );
 }
 
+/** Nombre de la marca en mayúsculas con la fuente Braze (si está en /public/fonts; si no, la fuente de la interfaz). */
+export function Wordmark({ className = "text-[15px]", badge = true }: { className?: string; badge?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 leading-none">
+      <span className={`font-brand font-semibold tracking-[0.06em] text-fg ${className}`}>
+        DEV<span className="text-fg-2">MARK</span>
+      </span>
+      {badge && <span className="rounded-md bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-accent-strong">AI</span>}
+    </span>
+  );
+}
+
 export function Logo() {
   return (
     <div className="flex items-center gap-2.5">
       <LogoMark />
-      <div className="leading-none">
-        <span className="text-[15px] font-semibold tracking-tight text-fg">
-          DEV<span className="text-fg-2">mark</span>
-        </span>
-        <span className="ml-1.5 rounded-md bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-accent-strong">AI</span>
-      </div>
+      <Wordmark />
     </div>
   );
 }
