@@ -35,3 +35,6 @@ Thumbs.db
 *.log
 *.tgz
 devmark_audit*.txt
+
+# Espacios de trabajo temporales de agentes
+.claude/worktrees/

@@ -59,19 +59,44 @@ def _test_connection(url: str) -> str:
         engine.dispose()
 
 
-def setup_env() -> None:
+def parse_connection_string(value: str) -> dict[str, str] | None:
+    """Extrae host/puerto/usuario/base de una cadena postgresql://usuario:pass@host:puerto/base
+    (la que muestra Supabase). La contraseña se ignora: siempre se pide aparte."""
+    match = re.match(r"^postgres(?:ql)?(?:\+\w+)?://([^:@/]+)(?::[^@]*)?@([^:/?]+)(?::(\d+))?(?:/([^?]+))?", value.strip())
+    if not match:
+        return None
+    user, host, port, database = match.groups()
+    return {"user": user, "host": host, "port": port or "5432", "database": database or "postgres"}
+
+
+def _replace_env_line(path: str, key: str, value: str) -> None:
+    with open(path) as fh:
+        lines = [line for line in fh.read().splitlines() if not line.startswith(f"{key}=")]
+    lines.append(f"{key}={value}")
+    with open(path, "w") as fh:
+        fh.write("\n".join(lines) + "\n")
+
+
+def setup_env(replace: bool = False) -> None:
     """Asistente: pide los datos del pooler de Supabase (o de un PostgreSQL propio),
-    prueba la conexión y añade DATABASE_URL + API_KEY_PEPPER al .env sin mostrarlos."""
+    prueba la conexión y añade DATABASE_URL + API_KEY_PEPPER al .env sin mostrarlos.
+    Con replace=True cambia solo DATABASE_URL (p. ej. tras cambiar la contraseña)."""
     existing = _read_env_keys(ENV_PATH)
     print(f"Archivo: {ENV_PATH}")
-    if "DATABASE_URL" in existing:
-        sys.exit("DATABASE_URL ya existe en .env. Edítalo a mano si quieres cambiarlo.")
+    if "DATABASE_URL" in existing and not replace:
+        sys.exit("DATABASE_URL ya existe en .env. Para cambiarla usa: python -m app.cli setup-env --replace")
 
-    print("Datos del 'Session pooler' de Supabase (Connect → Session pooler):")
+    print("Datos del 'Session pooler' de Supabase (Connect → Session pooler).")
+    print("Puedes pegar la cadena completa postgresql://... en 'Host'.")
     host = input("  Host (p. ej. aws-0-us-east-1.pooler.supabase.com): ").strip()
-    port = input("  Puerto [5432]: ").strip() or "5432"
-    user = input("  Usuario (p. ej. postgres.wgmdzfuvgkhyrlxlxckt): ").strip()
-    database = input("  Base de datos [postgres]: ").strip() or "postgres"
+    parsed = parse_connection_string(host)
+    if parsed:
+        host, port, user, database = parsed["host"], parsed["port"], parsed["user"], parsed["database"]
+        print(f"  → host {host}, puerto {port}, usuario {user}, base {database}")
+    else:
+        port = input("  Puerto [5432]: ").strip() or "5432"
+        user = input("  Usuario (p. ej. postgres.wgmdzfuvgkhyrlxlxckt): ").strip()
+        database = input("  Base de datos [postgres]: ").strip() or "postgres"
     password = getpass.getpass("  Contraseña (no se mostrará): ")
     if not (host and user and password and re.fullmatch(r"\d+", port)):
         sys.exit("Faltan datos")
@@ -83,6 +108,12 @@ def setup_env() -> None:
     except Exception as exc:  # noqa: BLE001
         sys.exit(f"No se pudo conectar: {type(exc).__name__}: {str(exc).splitlines()[0][:200]}")
     print(f"  OK: {version.split(' on ')[0]}")
+
+    if replace and "DATABASE_URL" in existing:
+        _replace_env_line(ENV_PATH, "DATABASE_URL", url)
+        os.chmod(ENV_PATH, stat.S_IRUSR | stat.S_IWUSR)
+        print("DATABASE_URL reemplazada. Reinicia el servicio: sudo systemctl restart devmark-ai")
+        return
 
     lines = [f"DATABASE_URL={url}"]
     if "API_KEY_PEPPER" not in existing:
@@ -98,7 +129,8 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("generate-secret", help="Genera un valor aleatorio para API_KEY_PEPPER")
-    sub.add_parser("setup-env", help="Configura DATABASE_URL y API_KEY_PEPPER en .env")
+    setup = sub.add_parser("setup-env", help="Configura DATABASE_URL y API_KEY_PEPPER en .env")
+    setup.add_argument("--replace", action="store_true", help="Reemplaza DATABASE_URL (p. ej. tras cambiar la contraseña)")
     sub.add_parser("check-db", help="Prueba la conexión a la base de datos")
     create = sub.add_parser("create-admin", help="Crea un administrador del dashboard")
     create.add_argument("--email", required=True)
@@ -112,7 +144,7 @@ def main(argv: list[str] | None = None) -> None:
         print(secrets.token_urlsafe(48))
         return
     if args.command == "setup-env":
-        setup_env()
+        setup_env(replace=args.replace)
         return
     if args.command == "check-db":
         from app.config import load_settings
