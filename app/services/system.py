@@ -164,6 +164,25 @@ def check_rag() -> dict:
     return _check("rag", "RAG", "online", f"Texto completo (español) · {documents} documentos · {chunks} fragmentos")
 
 
+def check_tools() -> dict:
+    if get_engine() is None:
+        return _check("tools", "Tools", "not_configured", "Requiere base de datos")
+    try:
+        from sqlalchemy import func, select
+
+        from app.database import session_scope
+        from app.models import Tool, application_tools
+
+        with session_scope() as db:
+            active = db.scalar(select(func.count()).select_from(Tool).where(Tool.enabled.is_(True))) or 0
+            assigned = db.scalar(select(func.count(func.distinct(application_tools.c.application_id)))) or 0
+    except Exception as exc:  # noqa: BLE001
+        return _check("tools", "Tools", "offline", type(exc).__name__)
+    if not active:
+        return _check("tools", "Tools", "not_configured", "Sin herramientas activas (créalas en Herramientas)")
+    return _check("tools", "Tools", "online", f"Function calling · {active} activas · {assigned} aplicaciones")
+
+
 async def full_status(request: Request) -> dict:
     (ollama_check, model_check, ollama_version), https_check, db_check, nginx_check = await asyncio.gather(
         check_ollama(),
@@ -171,7 +190,7 @@ async def full_status(request: Request) -> dict:
         asyncio.to_thread(check_database),
         check_nginx(request),
     )
-    rag_check = await asyncio.to_thread(check_rag)
+    rag_check, tools_check = await asyncio.gather(asyncio.to_thread(check_rag), asyncio.to_thread(check_tools))
     checks = [
         _check("api", "API Gateway", "online", "FastAPI respondiendo"),
         nginx_check,
@@ -180,7 +199,7 @@ async def full_status(request: Request) -> dict:
         model_check,
         db_check,
         rag_check,
-        _check("tools", "Tools", "not_configured", "Pendiente (function calling)"),
+        tools_check,
     ]
     return {
         "checked_at": datetime.now(timezone.utc).isoformat(),

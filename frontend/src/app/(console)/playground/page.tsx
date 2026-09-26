@@ -1,13 +1,13 @@
 "use client";
 
-import { BookOpen, ChevronDown, FlaskConical, RotateCcw, Send, Square } from "lucide-react";
+import { BookOpen, ChevronDown, FlaskConical, RotateCcw, Send, Square, Wrench } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Button, Card, CardHeader, Checkbox, CopyButton, Field, InlineError, Input, PageHeader, Select, Tag, Textarea, cx } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { formatMs, formatNumber } from "@/lib/format";
 import { useResource } from "@/lib/hooks";
-import type { Application, ModelsResponse, PlaygroundResponse } from "@/lib/types";
+import type { Application, ModelsResponse, PlaygroundResponse, Tool } from "@/lib/types";
 
 type Turn =
   | { role: "user"; content: string }
@@ -48,13 +48,48 @@ function Sources({ result }: { result: PlaygroundResponse }) {
   );
 }
 
+function ToolCalls({ result }: { result: PlaygroundResponse }) {
+  const [open, setOpen] = useState(false);
+  if (!result.tools) return null;
+  const calls = result.tools.calls;
+  if (!calls.length)
+    return <p className="mt-2 text-xs text-fg-3">Herramientas disponibles ({result.tools.available.join(", ") || "ninguna"}): la IA respondió sin usarlas.</p>;
+  return (
+    <div className="mt-2">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-accent-strong hover:underline" aria-expanded={open}>
+        <Wrench className="size-3.5" /> {calls.length} llamada(s) a herramientas
+        <span className="font-normal text-fg-3">· {calls.map((c) => c.name).join(", ")}</span>
+        <ChevronDown className={cx("size-3.5 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <ol className="mt-2 space-y-2">
+          {calls.map((c, i) => (
+            <li key={i} className="rounded-lg border border-line bg-bg-subtle p-3">
+              <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs text-fg-3">
+                <span className="font-mono font-medium text-fg">{c.name}</span>
+                <Tag className={c.ok ? "" : "border-critical/30 text-critical-text"}>{c.ok ? "ok" : "error"}</Tag>
+                {c.status_code && <Tag>HTTP {c.status_code}</Tag>}
+                <span className="tabular">{formatMs(c.ms)}</span>
+              </div>
+              <p className="font-mono text-[12px] break-words text-fg-2">{JSON.stringify(c.arguments)}</p>
+              {c.result && <pre className="mt-2 max-h-40 overflow-auto font-mono text-[11.5px] leading-5 whitespace-pre-wrap break-words text-fg-3">{c.result}</pre>}
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
 export default function PlaygroundPage() {
   const models = useResource<ModelsResponse>("/models");
   const apps = useResource<Application[]>("/applications");
+  const toolList = useResource<Tool[]>("/tools");
 
   const [model, setModel] = useState("");
   const [appId, setAppId] = useState("");
   const [useRag, setUseRag] = useState(false);
+  const [useTools, setUseTools] = useState(false);
   const [topK, setTopK] = useState(3);
   const [system, setSystem] = useState(DEFAULT_SYSTEM);
   const [temperature, setTemperature] = useState("");
@@ -68,6 +103,7 @@ export default function PlaygroundPage() {
   const cancelled = useRef(false);
 
   const app = apps.data?.find((a) => a.id === appId) ?? null;
+  const appTools = (toolList.data ?? []).filter((t) => t.enabled && t.applications.some((a) => a.id === appId));
 
   useEffect(() => {
     if (!model && models.data?.models.length) setModel(models.data.models.find((m) => m.is_default)?.name ?? models.data.models[0].name);
@@ -75,7 +111,10 @@ export default function PlaygroundPage() {
 
   useEffect(() => {
     if (app) setTopK(app.rag_top_k);
-    if (!app) setUseRag(false);
+    if (!app) {
+      setUseRag(false);
+      setUseTools(false);
+    }
   }, [app]);
 
   useEffect(() => {
@@ -114,6 +153,7 @@ export default function PlaygroundPage() {
           application_id: appId || null,
           use_rag: useRag,
           top_k: topK,
+          use_tools: useTools,
         },
       });
       if (cancelled.current) return;
@@ -176,7 +216,7 @@ export default function PlaygroundPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Conocimiento (RAG)" />
+            <CardHeader title="Aplicación: documentos y herramientas" />
             <div className="space-y-3 px-5 py-4">
               <Field label="Aplicación">
                 {(id) => (
@@ -195,6 +235,18 @@ export default function PlaygroundPage() {
                 onChange={(v) => setUseRag(v && !!app)}
                 label="Usar documentos de la aplicación"
                 description={app ? (app.document_count ? `Busca en ${app.document_count} documento(s) y añade los ${topK} fragmentos más relevantes.` : "Esta aplicación no tiene documentos todavía.") : "Elige una aplicación primero."}
+              />
+              <Checkbox
+                checked={useTools}
+                onChange={(v) => setUseTools(v && appTools.length > 0)}
+                label="Usar herramientas de la aplicación"
+                description={
+                  app
+                    ? appTools.length
+                      ? `La IA puede llamar a: ${appTools.map((t) => t.name).join(", ")}.`
+                      : "Esta aplicación no tiene herramientas asignadas (ver Herramientas)."
+                    : "Elige una aplicación primero."
+                }
               />
               {useRag && (
                 <Field label="Fragmentos por pregunta">
@@ -220,6 +272,7 @@ export default function PlaygroundPage() {
               <span className="flex items-center gap-2">
                 Chat <code className="font-mono text-xs font-normal text-fg-3">{model || "—"}</code>
                 {useRag && app && <Tag>RAG · {app.name}</Tag>}
+                {useTools && app && <Tag>Tools · {appTools.length}</Tag>}
               </span>
             }
             description={totals.n ? `${totals.n} respuesta(s) · ${formatNumber(totals.tokens)} tokens · media ${formatMs(totals.ms / totals.n)}` : "Las respuestas muestran tiempo, tokens y las fuentes usadas."}
@@ -264,6 +317,7 @@ export default function PlaygroundPage() {
                     {turn.result.finish_reason === "length" && <span className="text-warning">cortada por máx. tokens</span>}
                     <CopyButton value={turn.content} variant="ghost" className="!h-6 !px-1.5 text-[11.5px]" label="Copiar" />
                   </div>
+                  <ToolCalls result={turn.result} />
                   <Sources result={turn.result} />
                 </div>
               ) : (

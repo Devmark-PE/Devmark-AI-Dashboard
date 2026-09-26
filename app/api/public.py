@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from app.api.deps import authenticate, client_ip
 from app.config import get_settings
 from app.database import session_scope
-from app.services import ollama, rag
+from app.services import ollama, rag, tools
 from app.services.api_keys import KeyContext
 from app.services.request_log import RequestLogEntry, write_log
 
@@ -40,15 +40,37 @@ class ContentPart(BaseModel):
 class Message(BaseModel):
     role: Literal["system", "user", "assistant", "tool", "developer"]
     content: str | list[ContentPart] | None = ""
+    # Function calling (formato OpenAI): llamadas del asistente y respuestas de herramientas del cliente.
+    tool_calls: list[dict[str, Any]] | None = None
+    tool_call_id: str | None = None
+    name: str | None = None
 
-    def as_ollama(self) -> dict[str, str]:
+    def as_ollama(self) -> dict[str, Any]:
         if isinstance(self.content, list):
             content = "\n".join(part.text or "" for part in self.content if part.type == "text")
         else:
             content = self.content or ""
         # "developer" es el nuevo nombre de "system" en la API de OpenAI.
         role = "system" if self.role == "developer" else self.role
-        return {"role": role, "content": content}
+        item: dict[str, Any] = {"role": role, "content": content}
+        if self.tool_calls:
+            item["tool_calls"] = self.tool_calls
+        if self.tool_call_id:
+            item["tool_call_id"] = self.tool_call_id
+        if self.name:
+            item["name"] = self.name
+        return item
+
+
+class ToolFunction(BaseModel):
+    name: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
+    description: str | None = Field(default=None, max_length=2000)
+    parameters: dict[str, Any] | None = None
+
+
+class ClientTool(BaseModel):
+    type: Literal["function"] = "function"
+    function: ToolFunction
 
 
 class OpenAIChatRequest(BaseModel):
@@ -59,8 +81,13 @@ class OpenAIChatRequest(BaseModel):
     top_p: float | None = Field(default=None, ge=0, le=1)
     max_tokens: int | None = Field(default=None, ge=1, le=8192)
     stop: str | list[str] | None = None
+    # Function calling del cliente (formato OpenAI): el modelo devuelve tool_calls y la app ejecuta sus funciones.
+    tools: list[ClientTool] | None = Field(default=None, max_length=16)
+    tool_choice: str | dict[str, Any] | None = None
     # Extensión Devmark: forzar (true) o desactivar (false) el RAG de la aplicación. Por defecto, lo que diga la aplicación.
     rag: bool | None = None
+    # Extensión Devmark: usar (por defecto) o no (false) las herramientas configuradas para la aplicación en el dashboard.
+    server_tools: bool | None = None
 
 
 # --------------------------------------------------------------------------
@@ -75,7 +102,7 @@ def openai_error(status_code: int, message: str, error_type: str, code: str, bac
     )
 
 
-def _validate_input(model: str, messages: list[dict[str, str]]) -> JSONResponse | None:
+def _validate_input(model: str, messages: list[dict[str, Any]]) -> JSONResponse | None:
     settings = get_settings()
     if settings.allowed_models and model not in settings.allowed_models:
         return openai_error(400, f"Modelo no permitido: {model}", "invalid_request_error", "model_not_allowed")
@@ -129,7 +156,7 @@ def _rag_lookup(application_id, query: str, top_k: int) -> list[rag.SearchResult
         return rag.search(db, application_id, query, top_k)
 
 
-async def retrieve(context: KeyContext | None, messages: list[dict[str, str]], force: bool | None) -> list[rag.SearchResult]:
+async def retrieve(context: KeyContext | None, messages: list[dict[str, Any]], force: bool | None) -> list[rag.SearchResult]:
     """Fragmentos de la aplicación relevantes para el último mensaje del usuario ([] si no aplica)."""
     enabled = context is not None and context.application_id is not None and (force if force is not None else context.rag_enabled)
     query = rag.last_user_message(messages)
@@ -141,7 +168,22 @@ async def retrieve(context: KeyContext | None, messages: list[dict[str, str]], f
         return []
 
 
-def _messages_text(messages: list[dict[str, str]]) -> str:
+def _load_tools(application_id) -> list[tools.LoadedTool]:
+    with session_scope() as db:
+        return tools.load_for_application(db, application_id)
+
+
+async def server_tools_for(context: KeyContext | None, enabled: bool | None) -> list[tools.LoadedTool]:
+    """Herramientas configuradas para la aplicación de la key ([] si no hay o se desactivan con server_tools=false)."""
+    if enabled is False or context is None or context.application_id is None or not get_settings().database_enabled:
+        return []
+    try:
+        return await run_in_threadpool(_load_tools, context.application_id)
+    except Exception:  # noqa: BLE001 - si no se pueden cargar, se responde sin herramientas
+        return []
+
+
+def _messages_text(messages: list[dict[str, Any]]) -> str:
     return "\n".join(f"{m['role']}: {m['content']}" for m in messages)
 
 
@@ -194,7 +236,7 @@ async def openai_chat(
     start_time = time.time()
 
     model = body.model or settings.default_model
-    messages = [m.as_ollama() for m in body.messages]
+    messages = tools.openai_messages_to_ollama([m.as_ollama() for m in body.messages])
     invalid = _validate_input(model, messages)
     if invalid is not None:
         return invalid
@@ -212,16 +254,31 @@ async def openai_chat(
     if body.stop is not None:
         options["stop"] = [body.stop] if isinstance(body.stop, str) else body.stop
 
+    client_tools = [t.model_dump(exclude_none=True) for t in body.tools or []] if body.tool_choice != "none" else []
+    run: tools.ToolRun | None = None
     try:
-        data = await ollama.chat(model, messages, options or None)
+        if client_tools:
+            data = await ollama.chat(model, messages, options or None, tools=client_tools)
+        else:
+            available = await server_tools_for(context, body.server_tools)
+            if available:
+                run = await tools.chat_with_tools(model, messages, options or None, available)
+                data = run.data
+            else:
+                data = await ollama.chat(model, messages, options or None)
     except ollama.OllamaError as exc:
         _log(background, request, context, "/v1/chat/completions", exc.status_code, started, model, error=exc.message)
         return JSONResponse(status_code=exc.status_code, content=exc.to_openai(), background=background)
 
-    content = data.get("message", {}).get("content", "")
-    prompt_tokens = data.get("prompt_eval_count", 0) or 0
-    completion_tokens = data.get("eval_count", 0) or 0
+    reply = data.get("message") or {}
+    content = reply.get("content", "")
+    prompt_tokens = run.prompt_tokens if run else data.get("prompt_eval_count", 0) or 0
+    completion_tokens = run.completion_tokens if run else data.get("eval_count", 0) or 0
     finish_reason = "length" if data.get("done_reason") == "length" else "stop"
+    message: dict[str, Any] = {"role": "assistant", "content": content}
+    if client_tools and reply.get("tool_calls"):
+        message = {"role": "assistant", "content": content or None, "tool_calls": tools.ollama_tool_calls_to_openai(reply["tool_calls"])}
+        finish_reason = "tool_calls"
 
     _log(
         background, request, context, "/v1/chat/completions", 200, started, data.get("model", model),
@@ -238,7 +295,7 @@ async def openai_chat(
             "choices": [
                 {
                     "index": 0,
-                    "message": {"role": "assistant", "content": content},
+                    "message": message,
                     "finish_reason": finish_reason,
                 }
             ],
@@ -249,6 +306,7 @@ async def openai_chat(
             },
             "processing_time": round(time.time() - start_time, 2),
             **({"rag": {"sources": [s.as_dict(include_content=False) for s in sources]}} if sources else {}),
+            **({"tools": {"calls": [c.as_dict() for c in run.calls]}} if run and run.calls else {}),
         },
         background=background,
     )
