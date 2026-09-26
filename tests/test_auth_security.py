@@ -6,7 +6,7 @@ import pytest
 
 from app.database import session_scope
 from app.models import PasswordResetToken, User
-from app.services import mailer, totp
+from app.services import emails, mailer, totp
 from tests.conftest import ADMIN_EMAIL, ADMIN_PASSWORD
 
 
@@ -107,7 +107,9 @@ def test_remember_me_cookie(client):
 def outbox(monkeypatch):
     sent = []
     monkeypatch.setattr(mailer, "is_configured", lambda: True)
-    monkeypatch.setattr(mailer, "send", lambda to, subject, text, html=None: sent.append({"to": to, "text": text}) or True)
+    monkeypatch.setattr(
+        mailer, "send", lambda to, subject, text, html=None: sent.append({"to": to, "subject": subject, "text": text, "html": html}) or True
+    )
     return sent
 
 
@@ -152,3 +154,35 @@ def test_reset_invalidates_sessions_and_expired_tokens(admin, outbox):
 def test_forgot_without_smtp(client):
     assert client.get("/api/admin/auth/options").json() == {"password_reset_email": False}
     assert client.post("/api/admin/auth/password/forgot", json={"email": ADMIN_EMAIL}).json() == {"email_configured": False}
+
+
+def test_security_notifications(admin, outbox):
+    client, csrf = admin
+    secret, _ = enable_2fa(client, csrf)
+    assert [m["subject"] for m in outbox] == ["Verificación en dos pasos activada en DEVMARK AI"]
+    codes = client.post("/api/admin/auth/2fa/recovery-codes", json={"password": ADMIN_PASSWORD, "code": None, "recovery_code": None}, headers=csrf)
+    assert codes.status_code in (400, 422)  # sin segundo factor no se regenera ni se notifica
+    assert len(outbox) == 1
+    r = client.post("/api/admin/settings/password", json={"current_password": ADMIN_PASSWORD, "new_password": "otra-clave-segura-9"}, headers=csrf)
+    assert r.status_code == 204
+    changed = outbox[-1]
+    assert changed["to"] == ADMIN_EMAIL and "se cambió" in changed["subject"]
+    assert "Dirección IP" in changed["text"] and "Tarazona" not in changed["html"]
+    for m in outbox:  # nunca se envían secretos
+        assert secret not in m["text"] and secret not in m["html"] and "otra-clave-segura-9" not in m["html"]
+
+
+def test_email_template_escapes_and_has_text_version():
+    msg = emails.password_reset("<script>alert(1)</script>", "https://ai.example/reset?token=a&b=1", 30)
+    assert "<script>" not in msg.html and "&lt;script&gt;" in msg.html
+    assert "token=a&amp;b=1" in msg.html
+    assert "https://ai.example/reset?token=a&b=1" in msg.text and "30 minutos" in msg.text
+    assert msg.html.startswith("<!doctype html>") and "DEV<span" in msg.html
+
+
+def test_reset_sends_password_changed_notice(admin, outbox):
+    client, csrf = admin
+    client.post("/api/admin/auth/password/forgot", json={"email": ADMIN_EMAIL})
+    token = outbox[0]["text"].split("token=")[1].split()[0]
+    assert client.post("/api/admin/auth/password/reset", json={"token": token, "new_password": "nueva-clave-segura-9"}).status_code == 204
+    assert [m["subject"] for m in outbox] == ["Restablece tu contraseña de DEVMARK AI", "Tu contraseña de DEVMARK AI se cambió"]

@@ -20,32 +20,15 @@ Orden recomendado: de arriba a abajo. Marca `[x]` al terminar.
 - [x] Ubuntu actualizado y servidor reiniciado; `nginx`, `ollama` y `devmark-ai` activos.
 - [x] Decisión: se mantiene **t4g.small (2 GB)** para seguir en el plan gratuito de AWS.
 - [x] Endpoint `POST /chat` eliminado (no lo usaba ninguna app; la API es `/v1/chat/completions`).
+- [x] RAG, Playground, 2FA, recuperación de contraseña y documentación dinámica desplegados (migración `0004`).
+- [x] Despliegue automático instalado: cada merge a `main` se publica solo en ~2 min.
+- [x] **2FA activada** en la cuenta de administrador y códigos de recuperación guardados.
+- [x] Fuente Braze en el nombre DEVMARK.
 - [x] CORS activo para App-testeo-APIs (`https://devmark-pe.github.io`, solo `/v1/models` y `/v1/chat/completions`; otro dominio: `CORS_ALLOWED_ORIGINS` en `.env`).
 
 ---
 
-## 1. Desplegar esta versión (RAG, Playground, 2FA, recuperación, docs) 🟢
-
-Tras el merge del PR `dev → main` (servidor, SSH), **una sola vez** a mano:
-
-```bash
-cd ~/ai-server && git fetch -q origin main && git checkout -q -f -B main origin/main \
-  && venv/bin/pip install -q -r requirements.txt && venv/bin/alembic upgrade head \
-  && sudo systemctl restart devmark-ai
-venv/bin/alembic current               # debe mostrar 0004 (head)
-sudo bash deploy/nginx/install.sh      # permite subir PDFs de hasta 8 MB en /api/admin/rag/
-sudo bash deploy/auto-deploy/install.sh   # desde ahora, cada merge a main se despliega solo
-```
-
-Comprobar el despliegue automático: `systemctl list-timers devmark-deploy.timer` y
-`journalctl -u devmark-deploy -n 30 --no-pager` (tras el próximo merge debe decir «Desplegado …»).
-
-Luego en el dashboard:
-- **Configuración → Verificación en dos pasos → Activar 2FA**: escanea el QR con Google Authenticator / Authy /
-  1Password y **guarda los 10 códigos de recuperación** fuera del servidor.
-- **Conocimiento (RAG)** → elige la aplicación → *Añadir documento* → *Probar búsqueda* → *Activar RAG*.
-
-## 1b. Recuperar contraseña por email (opcional) 🟡
+## 1. Recuperar contraseña por email (opcional) 🟡
 
 Sin correo configurado, «¿Olvidaste tu contraseña?» muestra el comando de rescate
 (`venv/bin/python -m app.cli reset-password`). Para que envíe un enlace por email, añade al `.env` del servidor
@@ -55,12 +38,6 @@ Sin correo configurado, «¿Olvidaste tu contraseña?» muestra el comando de re
 nano ~/ai-server/.env      # SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
 sudo systemctl restart devmark-ai
 ```
-
-## 1c. Fuente de marca Braze 🟡
-
-El nombre **DEVMARK** usa la fuente *Braze* (DawnCreative). No se incluye en el repo (licencia).
-Si tu licencia permite uso web, copia `Braze.woff2` (o `Braze.otf`) en `frontend/public/fonts/`, ejecuta
-`cd frontend && npm run export:app` y haz commit. Mientras no esté, se muestra con la fuente de la interfaz.
 
 ## 2. Restringir SSH en AWS 🟠 (seguridad, no bloquea el funcionamiento)
 

@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import AdminContext, current_admin, get_admin_db
+from app.api.admin.auth import notify
+from app.api.deps import AdminContext, client_ip, current_admin, get_admin_db
 from app.config import get_settings
 from app.models import AdminSession
 from app.schemas.admin import ChangePasswordRequest
-from app.services import passwords
+from app.services import emails, passwords
 
 router = APIRouter(prefix="/settings", tags=["admin:settings"])
 
@@ -48,7 +49,13 @@ def get_platform_settings(db: Session = Depends(get_admin_db), ctx: AdminContext
 
 
 @router.post("/password", status_code=204)
-async def change_password(body: ChangePasswordRequest, db: Session = Depends(get_admin_db), ctx: AdminContext = Depends(current_admin)):
+async def change_password(
+    body: ChangePasswordRequest,
+    request: Request,
+    background: BackgroundTasks,
+    db: Session = Depends(get_admin_db),
+    ctx: AdminContext = Depends(current_admin),
+):
     problem = passwords.validate_password_strength(body.new_password)
     if problem:
         raise HTTPException(status_code=422, detail=problem)
@@ -58,6 +65,7 @@ async def change_password(body: ChangePasswordRequest, db: Session = Depends(get
     # Cierra todas las demás sesiones del usuario.
     db.execute(delete(AdminSession).where(AdminSession.user_id == ctx.user.id, AdminSession.id != ctx.session.id))
     db.commit()
+    notify(background, ctx.user, emails.password_changed(ctx.user.name or ctx.user.email, client_ip(request), via_reset=False))
 
 
 @router.post("/sessions/revoke-others", status_code=204)
