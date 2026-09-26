@@ -5,6 +5,7 @@ export interface User {
   email: string;
   name: string;
   last_login_at: string | null;
+  totp_enabled: boolean;
 }
 
 export interface Me {
@@ -214,4 +215,9 @@ export interface PlatformSettings {
     user_agent: string | null;
     current: boolean;
   }[];
+}
+
+export interface MfaChallenge {
+  mfa_required: true;
+  mfa_token: string;
 }

@@ -34,6 +34,8 @@ def validate_permissions(value: list[str]) -> list[str]:
 class LoginRequest(BaseModel):
     email: str = Field(max_length=255)
     password: str = Field(min_length=1, max_length=256)
+    # "Mantener sesión iniciada": sesión de REMEMBER_TTL_DAYS días en lugar de SESSION_TTL_HOURS horas.
+    remember: bool = False
 
     @field_validator("email")
     @classmethod
@@ -46,12 +48,43 @@ class UserOut(BaseModel):
     email: str
     name: str
     last_login_at: datetime | None
+    totp_enabled: bool = False
 
 
 class MeOut(BaseModel):
     user: UserOut
     csrf_token: str
     session_expires_at: datetime
+
+
+class MfaChallenge(BaseModel):
+    mfa_required: bool = True
+    mfa_token: str
+
+
+class LoginMfaRequest(BaseModel):
+    mfa_token: str = Field(min_length=10, max_length=512)
+    code: str | None = Field(default=None, max_length=12)
+    recovery_code: str | None = Field(default=None, max_length=32)
+
+
+class TotpCode(BaseModel):
+    code: str = Field(min_length=6, max_length=12)
+
+
+class TotpConfirm(BaseModel):
+    password: str = Field(min_length=1, max_length=256)
+    code: str | None = Field(default=None, max_length=12)
+    recovery_code: str | None = Field(default=None, max_length=32)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(max_length=255)
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=200)
+    new_password: str = Field(min_length=12, max_length=256)
 
 
 class ChangePasswordRequest(BaseModel):

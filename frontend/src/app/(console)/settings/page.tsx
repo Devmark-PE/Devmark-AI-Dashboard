@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { TwoFactorCard } from "@/components/TwoFactorCard";
+
 import { Button, Card, CardHeader, ErrorState, Field, InlineError, Input, LoadingState, PageHeader, StatusBadge } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -68,6 +70,8 @@ export default function SettingsPage() {
         <CardHeader title="Cuenta" description={me?.user.email} />
         <PasswordForm />
       </Card>
+
+      <TwoFactorCard />
 
       {settings.loading && !s ? (
         <LoadingState />

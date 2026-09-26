@@ -26,8 +26,11 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def create_session(db: Session, user: User, ip: str | None, user_agent: str | None) -> tuple[str, AdminSession]:
+def create_session(
+    db: Session, user: User, ip: str | None, user_agent: str | None, remember: bool = False
+) -> tuple[str, AdminSession]:
     settings = get_settings()
+    ttl = timedelta(days=settings.remember_ttl_days) if remember else timedelta(hours=settings.session_ttl_hours)
     token = secrets.token_urlsafe(32)
     now = utcnow()
     session = AdminSession(
@@ -36,7 +39,7 @@ def create_session(db: Session, user: User, ip: str | None, user_agent: str | No
         csrf_token=secrets.token_urlsafe(32),
         created_at=now,
         last_seen_at=now,
-        expires_at=now + timedelta(hours=settings.session_ttl_hours),
+        expires_at=now + ttl,
         ip=ip,
         user_agent=(user_agent or "")[:255] or None,
     )

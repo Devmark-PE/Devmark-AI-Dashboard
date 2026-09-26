@@ -1,0 +1,62 @@
+# Tests en cada PR y en cada push a dev/main: nada roto llega a producción.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: devmark
+          POSTGRES_PASSWORD: devmark
+          POSTGRES_DB: devmark_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U devmark" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check app tests migrations main.py
+      - name: Tests (SQLite)
+        run: pytest -q
+      - name: Tests (PostgreSQL)
+        run: pytest -q
+        env:
+          TEST_DATABASE_URL: postgresql+psycopg://devmark:devmark@127.0.0.1:5432/devmark_test
+      - name: Migraciones (upgrade/downgrade/check)
+        env:
+          DATABASE_URL: postgresql+psycopg://devmark:devmark@127.0.0.1:5432/devmark_test
+          API_KEY_PEPPER: ci-pepper-0123456789abcdefghijklmnopqrstuv
+        run: |
+          python - <<'PY'
+          from sqlalchemy import create_engine, text
+          with create_engine("postgresql+psycopg://devmark:devmark@127.0.0.1:5432/devmark_test").begin() as c:
+              c.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public"))
+          PY
+          alembic upgrade head && alembic check && alembic downgrade base && alembic upgrade head
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build

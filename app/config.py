@@ -70,6 +70,16 @@ class Settings:
     dashboard_timezone: str = "America/Lima"
     public_base_url: str = "https://ai.devmarkpe.com"
 
+    # --- Sesiones "mantener iniciada" ---
+    remember_ttl_days: int = 30
+
+    # --- Email (recuperación de contraseña). Opcional. ---
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str | None = None
+
     # --- Logs ---
     # Guardar el contenido de prompts y respuestas. Apagado por defecto.
     log_request_content: bool = False
@@ -103,6 +113,12 @@ def load_settings() -> Settings:
         dashboard_timezone=os.getenv("DASHBOARD_TIMEZONE", "America/Lima"),
         public_base_url=os.getenv("PUBLIC_BASE_URL", "https://ai.devmarkpe.com").rstrip("/"),
         log_request_content=_bool("LOG_REQUEST_CONTENT", False),
+        remember_ttl_days=_int("REMEMBER_TTL_DAYS", 30),
+        smtp_host=os.getenv("SMTP_HOST") or None,
+        smtp_port=_int("SMTP_PORT", 587),
+        smtp_user=os.getenv("SMTP_USER") or None,
+        smtp_password=os.getenv("SMTP_PASSWORD") or None,
+        smtp_from=os.getenv("SMTP_FROM") or None,
     )
     validate_settings(settings)
     return settings
