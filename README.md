@@ -64,7 +64,7 @@ Instalación inicial y comandos manuales: [`deploy/DEPLOY.md`](deploy/DEPLOY.md)
 | `frontend/` | Dashboard Next.js + TypeScript + Tailwind (export estático, fuente de marca Braze) |
 | `app/static/dashboard/` | Build del dashboard que sirve FastAPI en `/dashboard` |
 | `deploy/` | Servicio systemd, `DEPLOY.md`, Nginx, ajustes de Ollama y despliegue automático |
-| `docs/` | [`ARQUITECTURA.md`](docs/ARQUITECTURA.md) (cómo funciona todo) y [`PENDIENTES.md`](docs/PENDIENTES.md) (estado y tareas) |
+| `docs/` | [`ARQUITECTURA.md`](docs/ARQUITECTURA.md) (cómo funciona todo), [`GUIA-RAG-Y-HERRAMIENTAS.md`](docs/GUIA-RAG-Y-HERRAMIENTAS.md) (cómo subir información y crear herramientas) y [`PENDIENTES.md`](docs/PENDIENTES.md) |
 | `tests/` | pytest: API pública, keys, admin, RAG, herramientas, 2FA, recuperación, correos, CLI |
 
 ## Seguridad
