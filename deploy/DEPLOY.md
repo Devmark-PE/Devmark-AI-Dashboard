@@ -44,8 +44,8 @@ Convierte `~/ai-server` en una copia del repositorio. `.env` y `venv/` no se toc
 cd ~/ai-server
 git init -q
 git remote add origin https://github.com/Devmark-PE/Devmark-AI-Dashboard.git
-git fetch -q origin claude/hola-guxqtd
-git checkout -f -B deploy origin/claude/hola-guxqtd
+git fetch -q origin main
+git checkout -f -B main origin/main
 git log --oneline -1 && ls
 ```
 
@@ -128,7 +128,7 @@ Y cuando confirmes que ninguna app usa `POST /chat` sin key: `CHAT_REQUIRE_API_K
 ## Actualizar a una versión nueva
 
 ```bash
-cd ~/ai-server && git fetch -q origin claude/hola-guxqtd && git checkout -f -B deploy origin/claude/hola-guxqtd \
+cd ~/ai-server && git fetch -q origin main && git checkout -f -B main origin/main \
   && venv/bin/pip install -q -r requirements.txt && venv/bin/alembic upgrade head && sudo systemctl restart devmark-ai
 ```
 
