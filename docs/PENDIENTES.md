@@ -24,30 +24,14 @@ Orden recomendado: de arriba a abajo. Marca `[x]` al terminar.
 - [x] Despliegue automático instalado: cada merge a `main` se publica solo en ~2 min.
 - [x] **2FA activada** en la cuenta de administrador y códigos de recuperación guardados.
 - [x] Fuente Braze en el nombre DEVMARK.
+- [x] Correo configurado (Titan, `ai@devmarkpe.com`): recuperación de contraseña y avisos de seguridad con diseño DEVMARK.
+- [x] SSH restringido en AWS (`sg-00a716674b16980a2`): puerto 22 solo desde la IP de casa + lista `ec2-instance-connect`
+  (`pl-0e4bcff02b13bef1e`) para entrar desde el navegador. Si cambia tu IP: regla SSH → Origen → **Mi IP** → Guardar.
 - [x] CORS activo para App-testeo-APIs (`https://devmark-pe.github.io`, solo `/v1/models` y `/v1/chat/completions`; otro dominio: `CORS_ALLOWED_ORIGINS` en `.env`).
 
 ---
 
-## 1. Recuperar contraseña por email (opcional) 🟡
-
-Sin correo configurado, «¿Olvidaste tu contraseña?» muestra el comando de rescate
-(`venv/bin/python -m app.cli reset-password`). Para que envíe un enlace por email, añade al `.env` del servidor
-(ver `.env.example`; con Gmail usa una *contraseña de aplicación*, no tu contraseña normal):
-
-```bash
-nano ~/ai-server/.env      # SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
-sudo systemctl restart devmark-ai
-```
-
-## 2. Restringir SSH en AWS 🟠 (seguridad, no bloquea el funcionamiento)
-
-**Dónde:** consola AWS → EC2 → Security Groups → Inbound rules.
-
-- Regla del puerto **22**: cambia el origen `0.0.0.0/0` por **My IP** (`/32`).
-- Deja 80 y 443 abiertos a `0.0.0.0/0`. No abras 8000, 11434 ni 5432.
-- Si tu IP cambia y pierdes acceso: EC2 → Connect → *EC2 Instance Connect* o *Session Manager* y actualiza la regla.
-
-## 3. Migrar tus apps a keys nuevas y retirar la key antigua 🟡
+## 1. Migrar tus apps a keys nuevas y retirar la key antigua 🟡
 
 1. En el dashboard → API Keys, crea una key por aplicación.
 2. En cada app, reemplaza el valor de la key antigua por la nueva `dmk_live_…` (en su `.env`, nunca en el frontend).
@@ -57,12 +41,14 @@ sudo systemctl restart devmark-ai
    echo "LEGACY_API_KEY_ENABLED=false" >> ~/ai-server/.env && sudo systemctl restart devmark-ai
    ```
 
-## 4. A tener en cuenta 🔵
+## 2. A tener en cuenta 🔵
 
 - **Supabase plan gratuito**: se pausa tras 7 días sin actividad. Si la API recibe tráfico a diario no pasa; si se pausa, reactívalo desde la consola.
+- **IP pública automática** (`34.204.181.237`, sin IP elástica): reiniciar no la cambia, pero **detener e iniciar** la instancia sí,
+  y el dominio dejaría de apuntar al servidor. Antes de detenerla: asignar una IP elástica y actualizar el DNS.
 - **RAM (2 GB)**: el servidor funciona al límite con el modelo cargado. Evita instalar servicios nuevos en el EC2 (bases de datos, Node, Docker) y usa un solo modelo.
 
-## 5. Flujo de trabajo con ramas
+## 3. Flujo de trabajo con ramas
 
 - Se trabaja en **`dev`**. Para publicar: GitHub → *Pull requests* → *New* → base `main` ← compare `dev` → *Create* → *Merge*.
 - Después del merge, el servidor se actualiza solo en ~2 min (despliegue automático). Si una versión no arranca,

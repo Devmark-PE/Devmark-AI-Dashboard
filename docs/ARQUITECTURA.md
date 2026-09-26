@@ -183,4 +183,5 @@ Si cambias el frontend: `cd frontend && npm run export:app` y commitea `app/stat
 - **Rate limit distribuido**: `app/services/rate_limit.py` es en memoria (un worker); se reemplaza por Postgres/Redis sin tocar endpoints.
 - **RAG semántico**: añadir embeddings con pgvector a `rag_chunks` (hoy: texto completo en español).
 - **Tools / function calling**: tabla `tools` por aplicación y ejecución en `app/services/`.
-- **Streaming (SSE)**: `stream: true` hoy devuelve la respuesta completa.
+- **Instrucciones y límites por aplicación**: system prompt y `max_tokens` por defecto guardados en `applications`.
+- **Streaming (SSE)**: descartado por ahora; `stream: true` devuelve la respuesta completa.
