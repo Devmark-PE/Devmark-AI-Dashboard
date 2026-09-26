@@ -87,7 +87,9 @@ Errores: `401` key inválida/revocada/expirada · `403` sin permiso o app deshab
 
 - Sin PostgreSQL ni Node en el servidor (Supabase + dashboard estático).
 - Ollama (drop-in `deploy/ollama/devmark.conf`): 1 modelo cargado, 1 generación a la vez, modelo en memoria 24 h, contexto de 2048 tokens.
-- Con el modelo cargado quedan ~100 MB libres: el servidor funciona al límite. La solución de fondo es t4g.medium (4 GB); requiere Elastic IP y actualizar el DNS.
+- Con el modelo cargado quedan ~100 MB libres: el servidor funciona al límite, adecuado para uso ligero.
+  Decisión: se mantiene t4g.small (2 GB) por el plan gratuito de AWS. Si en el futuro se sube a t4g.medium (4 GB),
+  la IP pública cambia al detener la instancia: habría que asignar una Elastic IP y actualizar el DNS.
 - FastAPI: un worker, pool de conexiones pequeño, cliente HTTP compartido hacia Ollama.
 - Swap de 2 GB ya existente.
 
