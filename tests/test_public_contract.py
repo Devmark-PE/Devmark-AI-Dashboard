@@ -27,10 +27,10 @@ def test_root_json_accept_keeps_contract(client):
 
 def test_status(client, ollama):
     r = client.get("/status")
-    assert r.status_code == 200 and r.json() == {**SERVICE_INFO, "ollama": "connected"}
+    assert r.status_code == 200 and r.json() == {**SERVICE_INFO, "ollama": "connected", "ai": "active"}
     ollama.get("/api/version").mock(side_effect=httpx.ConnectError("down"))
     r = client.get("/status")
-    assert r.status_code == 200 and r.json() == {**SERVICE_INFO, "ollama": "unreachable"}
+    assert r.status_code == 200 and r.json() == {**SERVICE_INFO, "ollama": "unreachable", "ai": "active"}
 
 def test_health_real_check(client, ollama):
     assert client.get("/health").json() == {"status": "healthy", "ollama": "connected"}

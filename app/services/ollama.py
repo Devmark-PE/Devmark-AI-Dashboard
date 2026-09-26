@@ -96,6 +96,16 @@ async def chat(
         return await _request("POST", "/api/chat", json=payload)
 
 
+async def unload(model: str) -> None:
+    """Descarga el modelo de la RAM (keep_alive=0)."""
+    await _request("POST", "/api/generate", json={"model": model, "keep_alive": 0}, timeout=30.0)
+
+
+async def preload(model: str) -> None:
+    """Carga el modelo en memoria sin generar texto (usa el keep_alive configurado en Ollama)."""
+    await _request("POST", "/api/generate", json={"model": model}, timeout=180.0)
+
+
 async def list_models() -> list[dict[str, Any]]:
     data = await _request("GET", "/api/tags", timeout=10.0)
     return data.get("models", [])

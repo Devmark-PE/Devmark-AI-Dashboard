@@ -762,6 +762,7 @@ Cabecera:    apikey = key publishable/anon
                     ["422", "Formato incorrecto", "El JSON no cumple el esquema."],
                     ["429", "Límite excedido", "Demasiadas peticiones: espera y reintenta con backoff."],
                     ["503 / 504", "Modelo no disponible", "El modelo no responde o tardó demasiado: reintenta."],
+                    ["503 ai_paused", "IA en pausa", "Modo reposo activado desde el Dashboard. Actívala con «Activar IA»."],
                   ].map(([code, title, text]) => (
                     <tr key={code}>
                       <td className="w-24 px-5 py-3 font-mono text-fg">{code}</td>

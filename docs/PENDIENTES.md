@@ -52,6 +52,9 @@ Tras el merge se despliega solo (instala `cryptography` y aplica la migración `
 
 ## 3. A tener en cuenta 🔵
 
+- **Modo reposo**: en el Dashboard, **Pausar IA** libera la RAM del modelo cuando no se usa; **Activar IA** lo vuelve a
+  cargar en segundos. Mientras está en pausa, las apps reciben `503 ai_paused`. No apagues el servidor en AWS para esto.
+
 - **Supabase plan gratuito**: se pausa tras 7 días sin actividad. Si la API recibe tráfico a diario no pasa; si se pausa, reactívalo desde la consola.
 - **IP pública automática** (`34.204.181.237`, sin IP elástica): reiniciar no la cambia, pero **detener e iniciar** la instancia sí,
   y el dominio dejaría de apuntar al servidor. Antes de detenerla: asignar una IP elástica y actualizar el DNS.

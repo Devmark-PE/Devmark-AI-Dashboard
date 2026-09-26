@@ -145,7 +145,7 @@ Formato: `{{"error": {{"message": "…", "type": "…", "code": "…"}}}}`
 | 403 | Key sin permiso o aplicación deshabilitada | Revisar la key en el dashboard |
 | 404 | Modelo inexistente | Usar `{model}` |
 | 429 | Límite de peticiones por minuto | Esperar ~10–60 s y reintentar (con espera creciente) |
-| 503 / 504 | Modelo no disponible o lento | Reintentar 1–2 veces con espera |
+| 503 / 504 | Modelo no disponible o lento. Código `ai_paused`: la IA está en modo reposo | Reintentar 1–2 veces con espera; con `ai_paused`, avisar al usuario |
 
 ## Rendimiento (servidor pequeño)
 

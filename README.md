@@ -25,6 +25,7 @@ El servidor es un EC2 **t4g.small** (ARM64, 2 GB). Solo 80/443 (y SSH restringid
 | **Herramientas (Tools)** | La IA consulta datos reales (tablas de Supabase, APIs, páginas web) con credenciales cifradas y sin acceso a la red interna; también acepta `tools` en formato OpenAI |
 | **Playground** | Chat con el modelo desde el dashboard (sin API key), con o sin documentos |
 | **Uso y Logs** | Peticiones, tokens, latencia y errores por app/key/modelo, sin guardar prompts ni respuestas |
+| **Modo reposo** | Botón **Pausar / Activar IA** en el Dashboard: libera la RAM del modelo cuando no se usa, sin apagar el servidor |
 | **Sistema** | Estado de Ollama, Nginx, base de datos, RAM y disco |
 | **Documentación** | Guía dinámica dentro del dashboard: ejemplos en cURL/JS/Python/SDK de OpenAI y consola «Probar ahora» |
 | **Seguridad del admin** | Login con **2FA (TOTP)** y códigos de recuperación, recuperar contraseña por email, «mantener sesión», avisos de seguridad por correo |
@@ -64,7 +65,7 @@ Instalación inicial y comandos manuales: [`deploy/DEPLOY.md`](deploy/DEPLOY.md)
 | `app/api/admin/` | API del dashboard (`/api/admin/*`): auth y 2FA, aplicaciones, keys, RAG, herramientas, playground, logs, uso, modelos, sistema, configuración |
 | `app/services/` | Ollama, API keys (HMAC), sesiones, TOTP, correo y plantillas, RAG, herramientas, cifrado de secretos, límites, logs |
 | `app/models/` | Tablas (usuarios, sesiones, aplicaciones, keys, logs, RAG, tokens de recuperación) |
-| `migrations/` | Alembic: `0001` esquema · `0002` bloqueo de la API REST de Supabase · `0003` RAG · `0004` 2FA y recuperación · `0005` herramientas |
+| `migrations/` | Alembic: `0001` esquema · `0002` bloqueo de la API REST de Supabase · `0003` RAG · `0004` 2FA y recuperación · `0005` herramientas · `0006` modo reposo |
 | `frontend/` | Dashboard Next.js + TypeScript + Tailwind (export estático, fuente de marca Braze) |
 | `app/static/dashboard/` | Build del dashboard que sirve FastAPI en `/dashboard` |
 | `deploy/` | Servicio systemd, `DEPLOY.md`, Nginx, ajustes de Ollama y despliegue automático |

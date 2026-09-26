@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
+import { AI_POWER_EVENT } from "@/components/AiPowerCard";
 import { cx } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { useResource } from "@/lib/hooks";
@@ -21,7 +22,11 @@ function isActive(pathname: string, href: string) {
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { data } = useResource<{ ollama_status: string; default_model: string }>("/overview", 60_000);
+  const { data, reload } = useResource<{ ollama_status: string; default_model: string; ai_paused: boolean }>("/overview", 60_000);
+  useEffect(() => {
+    window.addEventListener(AI_POWER_EVENT, reload);
+    return () => window.removeEventListener(AI_POWER_EVENT, reload);
+  }, [reload]);
 
   return (
     <div className="flex h-full flex-col">
@@ -60,8 +65,8 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <p className="text-[11px] font-medium tracking-wider text-fg-3 uppercase">Modelo por defecto</p>
         <p className="mt-1 truncate font-mono text-[13px] text-fg">{data?.default_model ?? "—"}</p>
         <p className="mt-1.5 flex items-center gap-1.5 text-xs text-fg-3">
-          <span className={cx("size-1.5 rounded-full", data?.ollama_status === "online" ? "bg-good" : data ? "bg-critical" : "bg-fg-3")} />
-          {data ? (data.ollama_status === "online" ? "Ollama conectado" : "Ollama no responde") : "Comprobando…"}
+          <span className={cx("size-1.5 rounded-full", data?.ai_paused ? "bg-warning" : data?.ollama_status === "online" ? "bg-good" : data ? "bg-critical" : "bg-fg-3")} />
+          {data ? (data.ai_paused ? "IA en pausa (reposo)" : data.ollama_status === "online" ? "Ollama conectado" : "Ollama no responde") : "Comprobando…"}
         </p>
       </div>
     </div>

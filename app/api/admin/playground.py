@@ -12,7 +12,7 @@ from app.api.deps import AdminContext, client_ip, current_admin, get_admin_db
 from app.database import session_scope
 from app.models import Application
 from app.schemas.admin import PlaygroundRequest
-from app.services import ollama, rag, tools
+from app.services import ai_state, ollama, rag, tools
 from app.services.request_log import RequestLogEntry, write_log
 
 router = APIRouter(prefix="/playground", tags=["admin:playground"])
@@ -38,6 +38,8 @@ async def playground_chat(
 ):
     """Chat de prueba desde el dashboard: usa el Ollama del servidor con la sesión del administrador
     (sin API key). Opcionalmente añade el contexto RAG de una aplicación."""
+    if await run_in_threadpool(ai_state.is_paused):
+        raise HTTPException(status_code=503, detail="La IA está en pausa. Actívala en el Dashboard para usar el Playground.")
     if (body.use_rag or body.use_tools) and body.application_id is None:
         raise HTTPException(status_code=422, detail="Elige una aplicación para usar sus documentos o herramientas")
     if body.application_id is not None and db.get(Application, body.application_id) is None:
