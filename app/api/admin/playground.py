@@ -12,7 +12,7 @@ from app.api.deps import AdminContext, client_ip, current_admin, get_admin_db
 from app.database import session_scope
 from app.models import Application
 from app.schemas.admin import PlaygroundRequest
-from app.services import ollama, rag
+from app.services import ollama, rag, tools
 from app.services.request_log import RequestLogEntry, write_log
 
 router = APIRouter(prefix="/playground", tags=["admin:playground"])
@@ -21,6 +21,11 @@ router = APIRouter(prefix="/playground", tags=["admin:playground"])
 def _search(application_id, query: str, top_k: int) -> list[rag.SearchResult]:
     with session_scope() as db:
         return rag.search(db, application_id, query, top_k)
+
+
+def _tools(application_id) -> list[tools.LoadedTool]:
+    with session_scope() as db:
+        return tools.load_for_application(db, application_id)
 
 
 @router.post("/chat")
@@ -33,8 +38,8 @@ async def playground_chat(
 ):
     """Chat de prueba desde el dashboard: usa el Ollama del servidor con la sesión del administrador
     (sin API key). Opcionalmente añade el contexto RAG de una aplicación."""
-    if body.use_rag and body.application_id is None:
-        raise HTTPException(status_code=422, detail="Elige una aplicación para usar sus documentos")
+    if (body.use_rag or body.use_tools) and body.application_id is None:
+        raise HTTPException(status_code=422, detail="Elige una aplicación para usar sus documentos o herramientas")
     if body.application_id is not None and db.get(Application, body.application_id) is None:
         raise HTTPException(status_code=404, detail="Aplicación no encontrada")
 
@@ -72,14 +77,20 @@ async def playground_chat(
             ),
         )
 
+    available = await run_in_threadpool(_tools, body.application_id) if body.use_tools else []
+    run: tools.ToolRun | None = None
     try:
-        data = await ollama.chat(body.model, messages, options or None)
+        if available:
+            run = await tools.chat_with_tools(body.model, messages, options or None, available)
+            data = run.data
+        else:
+            data = await ollama.chat(body.model, messages, options or None)
     except ollama.OllamaError as exc:
         log(exc.status_code, error=exc.message)
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.message}, background=background)
 
-    prompt_tokens = data.get("prompt_eval_count", 0) or 0
-    completion_tokens = data.get("eval_count", 0) or 0
+    prompt_tokens = run.prompt_tokens if run else data.get("prompt_eval_count", 0) or 0
+    completion_tokens = run.completion_tokens if run else data.get("eval_count", 0) or 0
     log(200, prompt_tokens, completion_tokens, model=data.get("model"))
     return JSONResponse(
         {
@@ -90,6 +101,12 @@ async def playground_chat(
             "processing_ms": round((time.perf_counter() - started) * 1000),
             "load_ms": round((data.get("load_duration") or 0) / 1e6),
             "rag": {"used": body.use_rag, "search_ms": rag_ms, "sources": [s.as_dict() for s in sources]} if body.use_rag else None,
+            "tools": {
+                "available": [t.name for t in available],
+                "calls": [c.as_dict(include_result=True) for c in run.calls] if run else [],
+            }
+            if body.use_tools
+            else None,
         },
         background=background,
     )

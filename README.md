@@ -22,6 +22,7 @@ El servidor es un EC2 **t4g.small** (ARM64, 2 GB). Solo 80/443 (y SSH restringid
 | **API keys** | `dmk_live_…` / `dmk_test_…` por aplicación; se muestran una vez, se guarda solo el hash; permisos, límite por minuto, expiración, revocar y regenerar con periodo de gracia |
 | **Aplicaciones** | Agrupan keys; deshabilitar una app bloquea todas sus keys |
 | **Conocimiento (RAG)** | Documentos por aplicación (texto, .md, .txt, .pdf) con búsqueda de texto completo en español; se aplica automáticamente a las keys de esa app y devuelve las fuentes usadas |
+| **Herramientas (Tools)** | La IA consulta datos reales (tablas de Supabase, APIs, páginas web) con credenciales cifradas y sin acceso a la red interna; también acepta `tools` en formato OpenAI |
 | **Playground** | Chat con el modelo desde el dashboard (sin API key), con o sin documentos |
 | **Uso y Logs** | Peticiones, tokens, latencia y errores por app/key/modelo, sin guardar prompts ni respuestas |
 | **Sistema** | Estado de Ollama, Nginx, base de datos, RAM y disco |
@@ -56,15 +57,15 @@ Instalación inicial y comandos manuales: [`deploy/DEPLOY.md`](deploy/DEPLOY.md)
 |---|---|
 | `main.py` | Punto de entrada (`uvicorn main:app`) |
 | `app/api/public.py` | `/`, `/status`, `/health`, `/v1/chat/completions`, `/v1/models` |
-| `app/api/admin/` | API del dashboard (`/api/admin/*`): auth y 2FA, aplicaciones, keys, RAG, playground, logs, uso, modelos, sistema, configuración |
-| `app/services/` | Ollama, API keys (HMAC), sesiones, TOTP, correo y plantillas, RAG, límites, logs, estadísticas |
+| `app/api/admin/` | API del dashboard (`/api/admin/*`): auth y 2FA, aplicaciones, keys, RAG, herramientas, playground, logs, uso, modelos, sistema, configuración |
+| `app/services/` | Ollama, API keys (HMAC), sesiones, TOTP, correo y plantillas, RAG, herramientas, cifrado de secretos, límites, logs |
 | `app/models/` | Tablas (usuarios, sesiones, aplicaciones, keys, logs, RAG, tokens de recuperación) |
-| `migrations/` | Alembic: `0001` esquema · `0002` bloqueo de la API REST de Supabase · `0003` RAG · `0004` 2FA y recuperación |
+| `migrations/` | Alembic: `0001` esquema · `0002` bloqueo de la API REST de Supabase · `0003` RAG · `0004` 2FA y recuperación · `0005` herramientas |
 | `frontend/` | Dashboard Next.js + TypeScript + Tailwind (export estático, fuente de marca Braze) |
 | `app/static/dashboard/` | Build del dashboard que sirve FastAPI en `/dashboard` |
 | `deploy/` | Servicio systemd, `DEPLOY.md`, Nginx, ajustes de Ollama y despliegue automático |
 | `docs/` | [`ARQUITECTURA.md`](docs/ARQUITECTURA.md) (cómo funciona todo) y [`PENDIENTES.md`](docs/PENDIENTES.md) (estado y tareas) |
-| `tests/` | pytest: API pública, keys, admin, RAG, 2FA, recuperación, correos, CLI |
+| `tests/` | pytest: API pública, keys, admin, RAG, herramientas, 2FA, recuperación, correos, CLI |
 
 ## Seguridad
 
@@ -102,6 +103,5 @@ npm run export:app                     # build estático → app/static/dashboar
 ## Siguientes pasos
 
 - **Instrucciones y límites por aplicación** (system prompt y `max_tokens` guardados por app).
-- **Tools / function calling** para que la IA consulte sistemas de la empresa.
 - **Portal de clientes y cuotas** si la API se ofrece a terceros.
 - **RAG semántico** con pgvector (requiere más RAM para un modelo de embeddings).

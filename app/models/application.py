@@ -11,6 +11,7 @@ from app.database import Base, UTCDateTime, utcnow
 
 if TYPE_CHECKING:
     from app.models.api_key import ApiKey
+    from app.models.tool import Tool
 
 
 class Application(Base):
@@ -33,3 +34,4 @@ class Application(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 
     api_keys: Mapped[list[ApiKey]] = relationship(back_populates="application")
+    tools: Mapped[list[Tool]] = relationship(secondary="application_tools", back_populates="applications")

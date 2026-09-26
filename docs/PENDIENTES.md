@@ -27,28 +27,37 @@ Orden recomendado: de arriba a abajo. Marca `[x]` al terminar.
 - [x] Correo configurado (Titan, `ai@devmarkpe.com`): recuperación de contraseña y avisos de seguridad con diseño DEVMARK.
 - [x] SSH restringido en AWS (`sg-00a716674b16980a2`): puerto 22 solo desde la IP de casa + lista `ec2-instance-connect`
   (`pl-0e4bcff02b13bef1e`) para entrar desde el navegador. Si cambia tu IP: regla SSH → Origen → **Mi IP** → Guardar.
+- [x] Keys de prueba eliminadas; las apps nuevas usarán keys `dmk_…` por aplicación.
 - [x] CORS activo para App-testeo-APIs (`https://devmark-pe.github.io`, solo `/v1/models` y `/v1/chat/completions`; otro dominio: `CORS_ALLOWED_ORIGINS` en `.env`).
 
 ---
 
-## 1. Migrar tus apps a keys nuevas y retirar la key antigua 🟡
+## 1. Primera herramienta (Tools) 🟢
 
-1. En el dashboard → API Keys, crea una key por aplicación.
-2. En cada app, reemplaza el valor de la key antigua por la nueva `dmk_live_…` (en su `.env`, nunca en el frontend).
-3. Verifica en **Logs** que cada app aparece con su nombre (y ya no «Key heredada (.env)»).
-4. Cuando ninguna petición use la key antigua durante unos días (servidor, SSH):
-   ```bash
-   echo "LEGACY_API_KEY_ENABLED=false" >> ~/ai-server/.env && sudo systemctl restart devmark-ai
-   ```
+Tras el merge se despliega solo (instala `cryptography` y aplica la migración `0005`). Luego, en el dashboard:
 
-## 2. A tener en cuenta 🔵
+1. **Herramientas → Nueva herramienta → Tabla de Supabase**.
+2. URL: cambia `TU-PROYECTO` y `leads` por tu proyecto y tabla; ajusta las columnas de `select=` y los filtros.
+3. Cabecera `apikey`: la key **publishable/anon** de ese proyecto (Supabase → Project Settings → API Keys) y, en esa tabla,
+   una política RLS que permita solo `select`. Así la herramienta puede leer pero nunca modificar. (La key `secret`/`service_role`
+   también funciona, pero da acceso total: úsala solo si entiendes el riesgo; igual queda cifrada en el servidor.)
+4. Marca la aplicación que la usará → **Crear** → **Probar** con un nombre real.
+5. **Playground** → elige la aplicación → «Usar herramientas» → pregunta, por ejemplo, «¿Qué sabes del lead Ana?».
+
+## 2. Al conectar una app nueva 🟢
+
+1. Dashboard → **Aplicaciones** → crea la app → **API Keys** → crea su key (`dmk_live_…`; `dmk_test_…` para pruebas).
+2. Guarda la key en el backend de la app (su `.env`), nunca en el frontend.
+3. Comprueba en **Logs** que las peticiones aparecen con el nombre de la app.
+
+## 3. A tener en cuenta 🔵
 
 - **Supabase plan gratuito**: se pausa tras 7 días sin actividad. Si la API recibe tráfico a diario no pasa; si se pausa, reactívalo desde la consola.
 - **IP pública automática** (`34.204.181.237`, sin IP elástica): reiniciar no la cambia, pero **detener e iniciar** la instancia sí,
   y el dominio dejaría de apuntar al servidor. Antes de detenerla: asignar una IP elástica y actualizar el DNS.
 - **RAM (2 GB)**: el servidor funciona al límite con el modelo cargado. Evita instalar servicios nuevos en el EC2 (bases de datos, Node, Docker) y usa un solo modelo.
 
-## 3. Flujo de trabajo con ramas
+## 4. Flujo de trabajo con ramas
 
 - Se trabaja en **`dev`**. Para publicar: GitHub → *Pull requests* → *New* → base `main` ← compare `dev` → *Create* → *Merge*.
 - Después del merge, el servidor se actualiza solo en ~2 min (despliegue automático). Si una versión no arranca,

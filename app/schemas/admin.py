@@ -228,3 +228,4 @@ class PlaygroundRequest(BaseModel):
     application_id: uuid.UUID | None = None
     use_rag: bool = False
     top_k: int = Field(default=3, ge=1, le=8)
+    use_tools: bool = False

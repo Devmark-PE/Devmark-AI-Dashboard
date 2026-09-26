@@ -81,10 +81,17 @@ def _error_detail(response: httpx.Response) -> str | None:
     return str(message)[:200] if message else None
 
 
-async def chat(model: str, messages: list[dict[str, str]], options: dict[str, Any] | None = None) -> dict[str, Any]:
+async def chat(
+    model: str,
+    messages: list[dict[str, Any]],
+    options: dict[str, Any] | None = None,
+    tools: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     payload: dict[str, Any] = {"model": model, "messages": messages, "stream": False}
     if options:
         payload["options"] = options
+    if tools:
+        payload["tools"] = tools
     async with _get_semaphore():
         return await _request("POST", "/api/chat", json=payload)
 

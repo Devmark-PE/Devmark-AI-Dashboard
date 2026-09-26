@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, BookOpen, Braces, CircleAlert, Gauge, KeyRound, Library, Play, Rocket, ShieldCheck, Terminal } from "lucide-react";
+import { ArrowRight, BookOpen, Braces, CircleAlert, Gauge, KeyRound, Library, Play, Rocket, ShieldCheck, Terminal, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -190,6 +190,7 @@ const SECTIONS = [
   { id: "auth", label: "Autenticación", icon: KeyRound },
   { id: "endpoints", label: "Endpoints", icon: Braces },
   { id: "rag", label: "Conocimiento (RAG)", icon: Library },
+  { id: "tools", label: "Herramientas", icon: Wrench },
   { id: "limites", label: "Límites", icon: Gauge },
   { id: "errores", label: "Errores", icon: CircleAlert },
   { id: "seguridad", label: "Buenas prácticas", icon: ShieldCheck },
@@ -504,6 +505,8 @@ export default function DocsPage() {
                 ["top_p", "number 0–1", "no", "Muestreo por núcleo (alternativa a temperature)."],
                 ["stop", "string | array", "no", "Texto(s) donde cortar la respuesta."],
                 ["rag", "boolean", "no", "Extensión Devmark: fuerza (true) o desactiva (false) el RAG de la aplicación."],
+                ["tools", "array", "no", "Function calling formato OpenAI: la respuesta trae tool_calls y tu app ejecuta la función."],
+                ["server_tools", "boolean", "no", "Extensión Devmark: false desactiva las herramientas configuradas para la aplicación."],
               ]}
             />
             <p className="text-xs text-fg-3">El streaming (stream: true) no está disponible: siempre se devuelve la respuesta completa.</p>
@@ -559,6 +562,36 @@ export default function DocsPage() {
   "rag": {
     "sources": [
       { "title": "Preguntas frecuentes", "ordinal": 0, "score": 0.1 }
+    ]
+  }
+}`}
+            />
+          </div>
+        </Section>
+
+        <Section id="tools" title="Herramientas" icon={Wrench} description="La IA consulta datos reales de tus sistemas (Supabase, APIs, páginas web) mientras responde.">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-3 text-sm text-fg-2">
+              <p>
+                <strong className="text-fg">Del servidor (recomendado).</strong> Crea la herramienta en{" "}
+                <Link href="/tools/" className="font-medium text-accent-strong hover:underline">Herramientas</Link> y asígnala a una aplicación. Con sus keys, la IA decide cuándo usarla,
+                el servidor la ejecuta con credenciales cifradas y la respuesta indica qué herramientas se usaron. Tu app no cambia nada.
+              </p>
+              <p>
+                <strong className="text-fg">Del cliente (OpenAI).</strong> Envía <code className="font-mono text-fg">tools</code> como con OpenAI: si el modelo quiere usar una, la respuesta trae{" "}
+                <code className="font-mono text-fg">finish_reason: &quot;tool_calls&quot;</code>; tu app la ejecuta y reenvía el resultado con{" "}
+                <code className="font-mono text-fg">role: &quot;tool&quot;</code> y <code className="font-mono text-fg">tool_call_id</code>.
+              </p>
+              <p className="text-xs text-fg-3">El modelo es pequeño: funciona mejor con 2–3 herramientas por aplicación y descripciones claras.</p>
+            </div>
+            <CodeBlock
+              lang="json"
+              title="Respuesta con herramientas del servidor (extracto)"
+              code={`{
+  "choices": [ { "message": { "content": "Ana Pérez es de Lima; su estado es «nuevo»." } } ],
+  "tools": {
+    "calls": [
+      { "name": "buscar_lead", "arguments": { "nombre": "Ana" }, "ok": true, "ms": 180 }
     ]
   }
 }`}

@@ -64,6 +64,7 @@ export interface PlaygroundResponse {
   processing_ms: number;
   load_ms: number;
   rag: { used: boolean; search_ms: number | null; sources: RagResult[] } | null;
+  tools: { available: string[]; calls: ToolCall[] } | null;
 }
 
 export type Permission = "chat" | "models";
@@ -220,4 +221,50 @@ export interface PlatformSettings {
 export interface MfaChallenge {
   mfa_required: true;
   mfa_token: string;
+}
+
+export type ToolParamType = "string" | "number" | "integer" | "boolean";
+
+export interface ToolParameter {
+  name: string;
+  type: ToolParamType;
+  description: string;
+  required?: boolean;
+  enum?: string[];
+}
+
+export interface Tool {
+  id: string;
+  name: string;
+  description: string;
+  kind: "http" | "web";
+  method: "GET" | "POST";
+  url_template: string;
+  body_template: string | null;
+  headers: { name: string; has_value: boolean; preview: string }[];
+  parameters: ToolParameter[];
+  response_path: string | null;
+  max_chars: number;
+  enabled: boolean;
+  applications: { id: string; name: string }[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ToolTestResult {
+  ok: boolean;
+  arguments: Record<string, unknown>;
+  status_code: number | null;
+  ms: number;
+  url: string | null;
+  result: string;
+}
+
+export interface ToolCall {
+  name: string;
+  arguments: Record<string, unknown>;
+  ok: boolean;
+  ms: number;
+  status_code?: number;
+  result?: string;
 }

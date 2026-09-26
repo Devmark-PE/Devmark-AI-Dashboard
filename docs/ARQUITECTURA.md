@@ -92,8 +92,9 @@ Errores: `401` key inválida/revocada/expirada · `403` sin permiso o app deshab
 | `api_request_logs` | Una fila por request: app, key, endpoint, modelo, tokens, tiempo, estado, error |
 | `rag_documents` | Documentos de conocimiento por aplicación (título, tipo, tamaño, nº de fragmentos) |
 | `rag_chunks` | Fragmentos indexados (índice FTS en español) |
+| `tools`, `application_tools` | Herramientas (URL, parámetros, cabeceras cifradas) y a qué aplicaciones se asignan |
 
-- Migraciones con **Alembic** (`migrations/`). `0003` crea las tablas RAG, `0004` la 2FA y la recuperación de contraseña. `0002`–`0004` activan RLS y revoca `anon`/`authenticated`: la API REST pública de Supabase no puede leer estas tablas.
+- Migraciones con **Alembic** (`migrations/`). `0003` crea las tablas RAG, `0004` la 2FA y la recuperación de contraseña, `0005` las herramientas. `0002`–`0005` activan RLS y revoca `anon`/`authenticated`: la API REST pública de Supabase no puede leer estas tablas.
 - Conexión por **Session pooler** (IPv4) con `sslmode=require`. El backend no usa ninguna key de Supabase.
 
 ## 7. Conocimiento (RAG) y Playground
@@ -117,6 +118,31 @@ No usa RAM del EC2: la búsqueda corre en Supabase. Preparado para pgvector (bú
 Permite elegir modelo, system prompt, temperatura, máx. tokens y, opcionalmente, los documentos de una aplicación;
 muestra tiempo, tokens, carga del modelo y las **fuentes usadas**. Se registra en Logs como `/playground`.
 
+## 7b. Herramientas (Tools / function calling)
+
+Permiten que la IA consulte **datos reales** de otros sistemas mientras responde (dashboard → *Herramientas*).
+
+| Tipo | Qué hace | Ejemplo |
+|---|---|---|
+| **API (JSON)** | GET/POST a una URL con parámetros que rellena el modelo | Tabla `leads` de otra Supabase vía su API REST: `…/rest/v1/leads?nombre=ilike.*{nombre}*` |
+| **Página web** | Descarga la página y devuelve su texto | Promociones o horarios publicados en la web |
+
+Flujo (`app/services/tools.py`): si la aplicación de la key tiene herramientas activas, `/v1/chat/completions` se las
+ofrece al modelo; si el modelo pide una, el servidor la ejecuta y le devuelve el resultado (máx. 3 rondas, 3 llamadas
+por ronda). La respuesta añade `tools.calls` (nombre, argumentos, ok, ms; sin el resultado crudo). `"server_tools": false`
+las desactiva por petición. También se aceptan `tools` en formato OpenAI (function calling del cliente: la respuesta
+trae `tool_calls` y la app ejecuta la función).
+
+Seguridad:
+- El modelo solo rellena **parámetros** declarados; no ve ni cambia la URL, las cabeceras ni escribe SQL.
+- **Cabeceras cifradas** (Fernet, llave derivada de `API_KEY_PEPPER`, `app/services/secrets.py`); el dashboard nunca las devuelve.
+- **Sin acceso a la red interna**: se valida el DNS antes de cada petición y redirección (bloquea 127.0.0.1, 10.x,
+  172.16–31.x, 192.168.x, 169.254.169.254 de AWS, IPv6 locales…). El dominio de la URL no puede depender de un parámetro.
+- Límites: 10 s por llamada, 1 MB de respuesta, resultado recortado (`max_chars`) para el contexto del modelo.
+- Para Supabase: usar una key con permisos de solo lectura (o una vista/tabla con RLS que solo permita `select`).
+
+Tablas: `tools` y `application_tools` (migración `0005`). El Playground permite probarlas y ver cada llamada con su resultado.
+
 ## 8. Ajustes para 2 GB de RAM
 
 - Sin PostgreSQL ni Node en el servidor (Supabase + dashboard estático).
@@ -136,8 +162,8 @@ app/
   database.py        SQLAlchemy + fechas UTC
   api/public.py      endpoints públicos (contrato original)
   api/deps.py        autenticación por API key y por sesión
-  api/admin/         auth (login, 2FA, recuperación), applications, keys, logs, usage, models, system, settings, rag, playground
-  services/          ollama, api_keys, passwords, sessions, totp, mailer, rag, rate_limit, request_log, stats, system
+  api/admin/         auth (login, 2FA, recuperación), applications, keys, logs, usage, models, system, settings, rag, tools, playground
+  services/          ollama, api_keys, passwords, sessions, totp, mailer, emails, rag, tools, secrets, rate_limit, request_log, stats, system
   models/            tablas
   schemas/           validación del API de administración
   cli.py             setup-env, check-db, create-admin, reset-password, list-admins
@@ -182,6 +208,5 @@ Si cambias el frontend: `cd frontend && npm run export:app` y commitea `app/stat
 
 - **Rate limit distribuido**: `app/services/rate_limit.py` es en memoria (un worker); se reemplaza por Postgres/Redis sin tocar endpoints.
 - **RAG semántico**: añadir embeddings con pgvector a `rag_chunks` (hoy: texto completo en español).
-- **Tools / function calling**: tabla `tools` por aplicación y ejecución en `app/services/`.
 - **Instrucciones y límites por aplicación**: system prompt y `max_tokens` por defecto guardados en `applications`.
 - **Streaming (SSE)**: descartado por ahora; `stream: true` devuelve la respuesta completa.
