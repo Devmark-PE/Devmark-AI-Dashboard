@@ -15,6 +15,7 @@ import time
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
+import httpx
 from fastapi import Request
 from sqlalchemy import text
 
@@ -69,15 +70,26 @@ async def check_https() -> dict:
     return _check("https", "HTTPS", status, f"{info['protocol']} · certificado vence en {days} días", latency)
 
 
-def check_nginx(request: Request) -> dict:
-    client = request.client.host if request.client else ""
-    proxied = client in {"127.0.0.1", "::1"} and (
-        "x-forwarded-for" in request.headers or "x-real-ip" in request.headers
-    )
-    if proxied:
+async def check_nginx(request: Request) -> dict:
+    """Comprobación real: pide {PUBLIC_BASE_URL}/health por Internet y verifica que responde Nginx
+    y que llega a FastAPI (200 o 503 son respuestas de FastAPI)."""
+    url = get_settings().public_base_url + "/health"
+    started = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=5.0, follow_redirects=False) as client:
+            response = await client.get(url)
+        latency = round((time.perf_counter() - started) * 1000)
+        server = response.headers.get("server", "")
+        if server.lower().startswith("nginx") and response.status_code in (200, 503):
+            return _check("nginx", "Nginx", "online", f"Reverse proxy → FastAPI (HTTP {response.status_code})", latency)
+        return _check("nginx", "Nginx", "warning", f"Respuesta inesperada: HTTP {response.status_code}, server «{server or '—'}»", latency)
+    except Exception:  # noqa: BLE001 - sin salida a Internet: se usa la evidencia de esta petición
+        pass
+    # Plan B: FastAPI solo escucha en 127.0.0.1, así que estas cabeceras solo pueden venir de Nginx.
+    if "x-real-ip" in request.headers or "x-forwarded-for" in request.headers:
         proto = request.headers.get("x-forwarded-proto", "?")
         return _check("nginx", "Nginx", "online", f"Petición recibida vía reverse proxy ({proto})")
-    return _check("nginx", "Nginx", "unknown", "Esta petición no pasó por Nginx")
+    return _check("nginx", "Nginx", "unknown", "No se pudo comprobar (esta petición no pasó por Nginx)")
 
 
 async def check_ollama() -> tuple[dict, dict, str | None]:
@@ -138,14 +150,15 @@ def host_metrics() -> dict:
 
 
 async def full_status(request: Request) -> dict:
-    (ollama_check, model_check, ollama_version), https_check, db_check = await asyncio.gather(
+    (ollama_check, model_check, ollama_version), https_check, db_check, nginx_check = await asyncio.gather(
         check_ollama(),
         check_https(),
         asyncio.to_thread(check_database),
+        check_nginx(request),
     )
     checks = [
         _check("api", "API Gateway", "online", "FastAPI respondiendo"),
-        check_nginx(request),
+        nginx_check,
         https_check,
         ollama_check,
         model_check,
