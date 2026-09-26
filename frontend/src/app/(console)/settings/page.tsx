@@ -125,7 +125,6 @@ export default function SettingsPage() {
                 ["Modelos permitidos", s.allowed_models.length ? s.allowed_models.join(", ") : "Todos los instalados", "ALLOWED_MODELS"],
                 ["Peticiones simultáneas a Ollama", s.ollama_max_concurrency, "OLLAMA_MAX_CONCURRENCY"],
                 ["Key heredada (.env)", s.legacy_api_key_enabled ? "Activa — desactívala cuando migres tus clientes" : "Desactivada", "LEGACY_API_KEY_ENABLED"],
-                ["/chat exige API key", s.chat_require_api_key ? "Sí" : "No", "CHAT_REQUIRE_API_KEY"],
                 ["Guardar contenido de requests", s.log_request_content ? "Sí" : "No", "LOG_REQUEST_CONTENT"],
                 ["Máx. mensajes / caracteres", `${s.max_messages} / ${s.max_input_chars.toLocaleString("es-PE")}`, "MAX_MESSAGES · MAX_INPUT_CHARS"],
                 ["Duración de sesión", `${s.session_ttl_hours} h`, "SESSION_TTL_HOURS"],

@@ -33,7 +33,6 @@ Puertos abiertos a Internet: solo 22 (SSH), 80 y 443. FastAPI, Ollama y la base 
 | `GET /health` | Público | `200 healthy` si Ollama responde, `503 degraded` si no |
 | `POST /v1/chat/completions` | API key, permiso `chat` | Chat compatible con OpenAI |
 | `GET /v1/models` | API key, permiso `models` | Modelos disponibles |
-| `POST /chat` | Público (hasta activar `CHAT_REQUIRE_API_KEY=true`) | Endpoint original simple |
 | `/dashboard/` | Login de administrador | Consola web |
 | `/api/admin/*` | Cookie de sesión + CSRF | API que usa el dashboard |
 | `/docs`, `/openapi.json` | Bloqueados (404) | Se activan solo con `ENABLE_DOCS=true` |
@@ -88,7 +87,9 @@ Errores: `401` key inválida/revocada/expirada · `403` sin permiso o app deshab
 
 - Sin PostgreSQL ni Node en el servidor (Supabase + dashboard estático).
 - Ollama (drop-in `deploy/ollama/devmark.conf`): 1 modelo cargado, 1 generación a la vez, modelo en memoria 24 h, contexto de 2048 tokens.
-- Con el modelo cargado quedan ~100 MB libres: el servidor funciona al límite. La solución de fondo es t4g.medium (4 GB); requiere Elastic IP y actualizar el DNS.
+- Con el modelo cargado quedan ~100 MB libres: el servidor funciona al límite, adecuado para uso ligero.
+  Decisión: se mantiene t4g.small (2 GB) por el plan gratuito de AWS. Si en el futuro se sube a t4g.medium (4 GB),
+  la IP pública cambia al detener la instancia: habría que asignar una Elastic IP y actualizar el DNS.
 - FastAPI: un worker, pool de conexiones pequeño, cliente HTTP compartido hacia Ollama.
 - Swap de 2 GB ya existente.
 

@@ -123,7 +123,6 @@ Cuando todos tus clientes usen keys `dmk_live_…`:
 echo "LEGACY_API_KEY_ENABLED=false" >> ~/ai-server/.env && sudo systemctl restart devmark-ai
 ```
 
-Y cuando confirmes que ninguna app usa `POST /chat` sin key: `CHAT_REQUIRE_API_KEY=true`.
 
 ## Actualizar a una versión nueva
 

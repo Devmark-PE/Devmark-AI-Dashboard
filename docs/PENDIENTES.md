@@ -18,25 +18,13 @@ Orden recomendado: de arriba a abajo. Marca `[x]` al terminar.
 - [x] Ollama ajustado para 2 GB (`deploy/ollama/install.sh`, contexto 2048).
 - [x] `API_KEY_PEPPER` respaldado fuera del servidor.
 - [x] Ubuntu actualizado y servidor reiniciado; `nginx`, `ollama` y `devmark-ai` activos.
+- [x] Decisión: se mantiene **t4g.small (2 GB)** para seguir en el plan gratuito de AWS.
+- [x] Endpoint `POST /chat` eliminado (no lo usaba ninguna app; la API es `/v1/chat/completions`).
+- [x] CORS activo para App-testeo-APIs (`https://devmark-pe.github.io`, solo `/v1/models` y `/v1/chat/completions`; otro dominio: `CORS_ALLOWED_ORIGINS` en `.env`).
 
 ---
 
-## 1. Activar CORS para App-testeo-APIs 🟡
-
-1. GitHub: merge del PR #4 (dev → main).
-2. Servidor (SSH):
-   ```bash
-   cd ~/ai-server && git fetch -q origin main && git checkout -q -f -B main origin/main && sudo systemctl restart devmark-ai
-   ```
-3. Comprobar: el preflight devuelve `access-control-allow-origin: https://devmark-pe.github.io`
-   ```bash
-   curl -s -o /dev/null -D - -X OPTIONS https://ai.devmarkpe.com/v1/chat/completions \
-     -H "Origin: https://devmark-pe.github.io" -H "Access-Control-Request-Method: POST" \
-     -H "Access-Control-Request-Headers: authorization,content-type" | grep -i access-control
-   ```
-Otro dominio: `CORS_ALLOWED_ORIGINS=https://dominio-final.com` en `.env` y reiniciar `devmark-ai`.
-
-## 2. Restringir SSH en AWS 🟠 (seguridad, no bloquea el funcionamiento)
+## 1. Restringir SSH en AWS 🟠 (seguridad, no bloquea el funcionamiento)
 
 **Dónde:** consola AWS → EC2 → Security Groups → Inbound rules.
 
@@ -44,7 +32,7 @@ Otro dominio: `CORS_ALLOWED_ORIGINS=https://dominio-final.com` en `.env` y reini
 - Deja 80 y 443 abiertos a `0.0.0.0/0`. No abras 8000, 11434 ni 5432.
 - Si tu IP cambia y pierdes acceso: EC2 → Connect → *EC2 Instance Connect* o *Session Manager* y actualiza la regla.
 
-## 3. Migrar tus apps a keys nuevas y retirar la key antigua 🟡
+## 2. Migrar tus apps a keys nuevas y retirar la key antigua 🟡
 
 1. En el dashboard → API Keys, crea una key por aplicación.
 2. En cada app, reemplaza el valor de la key antigua por la nueva `dmk_live_…` (en su `.env`, nunca en el frontend).
@@ -54,25 +42,12 @@ Otro dominio: `CORS_ALLOWED_ORIGINS=https://dominio-final.com` en `.env` y reini
    echo "LEGACY_API_KEY_ENABLED=false" >> ~/ai-server/.env && sudo systemctl restart devmark-ai
    ```
 
-## 4. Proteger `/chat` 🟡
+## 3. A tener en cuenta 🔵
 
-**Comprobar si alguien lo usa** (dashboard → Logs → filtro endpoint `/chat`, o SSH):
-```bash
-sudo zgrep -h '"POST /chat' /var/log/nginx/access.log* | awk '{print $1, $9}' | sort | uniq -c | sort -rn | head
-```
-Si no hay ninguna app tuya (solo bots o nada):
-```bash
-echo "CHAT_REQUIRE_API_KEY=true" >> ~/ai-server/.env && sudo systemctl restart devmark-ai
-```
-**Comprobar:** `curl -s -X POST https://ai.devmarkpe.com/chat -H 'Content-Type: application/json' -d '{"message":"hola"}'` → `{"detail":"API key requerida"}`.
-
-## 5. Decisiones pendientes 🔵
-
-- **RAM**: seguir en t4g.small (2 GB) o subir a t4g.medium (4 GB, ~12 USD/mes más).
-  Antes de cambiar el tipo de instancia hay que asignar una **Elastic IP** a `34.204.181.237` (EC2 → Elastic IPs); si no, la IP cambia y el DNS deja de apuntar.
 - **Supabase plan gratuito**: se pausa tras 7 días sin actividad. Si la API recibe tráfico a diario no pasa; si se pausa, reactívalo desde la consola.
+- **RAM (2 GB)**: el servidor funciona al límite con el modelo cargado. Evita instalar servicios nuevos en el EC2 (bases de datos, Node, Docker) y usa un solo modelo.
 
-## 6. Flujo de trabajo con ramas
+## 4. Flujo de trabajo con ramas
 
 - Se trabaja en **`dev`**. Para publicar: GitHub → *Pull requests* → *New* → base `main` ← compare `dev` → *Create* → *Merge*.
 - Después del merge, actualiza el servidor con el comando de `docs/ARQUITECTURA.md` §9.
