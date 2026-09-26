@@ -116,3 +116,22 @@ def test_models_when_ollama_down(admin):
         mock.get("/api/ps").mock(side_effect=httpx.ConnectError("down"))
         data = client.get("/api/admin/models").json()
     assert data["ollama_status"] == "offline" and data["models"] == []
+
+
+def test_nginx_check_real_and_fallback(admin, ollama):
+    import httpx
+
+    client, _ = admin
+    # 1) Comprobación real: /health por Internet responde Nginx → online con latencia
+    ollama.get(url="https://example.invalid/health").mock(return_value=httpx.Response(200, headers={"server": "nginx"}, json={}))
+    check = {c["id"]: c for c in client.get("/api/admin/system").json()["checks"]}["nginx"]
+    assert check["status"] == "online" and check["latency_ms"] is not None
+
+    # 2) Otro servidor responde → warning, nunca online
+    ollama.get(url="https://example.invalid/health").mock(return_value=httpx.Response(200, headers={"server": "cloudflare"}))
+    assert {c["id"]: c for c in client.get("/api/admin/system").json()["checks"]}["nginx"]["status"] == "warning"
+
+    # 3) Sin salida a Internet pero la petición trae cabeceras del proxy → online (plan B)
+    ollama.get(url="https://example.invalid/health").mock(side_effect=httpx.ConnectError("no route"))
+    r = client.get("/api/admin/system", headers={"X-Real-IP": "203.0.113.5", "X-Forwarded-Proto": "https"})
+    assert {c["id"]: c for c in r.json()["checks"]}["nginx"]["status"] == "online"
