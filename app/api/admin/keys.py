@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,7 +12,7 @@ from app.api.deps import AdminContext, current_admin, get_admin_db
 from app.config import get_settings
 from app.database import utcnow
 from app.models import ApiKey, Application
-from app.schemas.admin import ApiKeyCreate, ApiKeyCreated, ApiKeyOut, ApiKeyUpdate
+from app.schemas.admin import ApiKeyCreate, ApiKeyCreated, ApiKeyOut, ApiKeyRegenerate, ApiKeyUpdate
 from app.services import api_keys
 
 router = APIRouter(prefix="/api-keys", tags=["admin:api-keys"])
@@ -91,6 +92,49 @@ def create_key(body: ApiKeyCreate, db: Session = Depends(get_admin_db), ctx: Adm
     db.add(key)
     db.commit()
     return ApiKeyCreated(**_out(key, app.name).model_dump(), key=raw_key)
+
+
+@router.post("/{key_id}/regenerate", response_model=ApiKeyCreated, status_code=201)
+def regenerate_key(
+    key_id: uuid.UUID,
+    body: ApiKeyRegenerate,
+    db: Session = Depends(get_admin_db),
+    ctx: AdminContext = Depends(current_admin),
+):
+    """Crea una key nueva con la misma configuración y retira la anterior.
+
+    La key completa no se puede volver a mostrar (solo se guarda su hash), así que
+    "recuperar" una key significa emitir otra. La anterior sigue funcionando
+    `grace_hours` horas para cambiarla en la aplicación sin cortes.
+    """
+    old = _get(db, key_id)
+    now = utcnow()
+    expires_at = old.expires_at if old.expires_at and old.expires_at > now else None
+
+    raw_key = api_keys.generate_key(old.environment)
+    new = ApiKey(
+        application_id=old.application_id,
+        name=old.name,
+        prefix=api_keys.key_prefix(raw_key),
+        key_hash=api_keys.hash_key(raw_key, get_settings().api_key_pepper or ""),
+        environment=old.environment,
+        permissions=list(old.permissions or []),
+        rate_limit_rpm=old.rate_limit_rpm,
+        expires_at=expires_at,
+        created_by_id=ctx.user.id,
+    )
+    db.add(new)
+
+    old.name = f"{old.name} (anterior)"[:120]
+    if old.status == "active":
+        if body.grace_hours == 0:
+            old.status = "revoked"
+            old.revoked_at = now
+        else:
+            grace_end = now + timedelta(hours=body.grace_hours)
+            old.expires_at = min(old.expires_at, grace_end) if old.expires_at else grace_end
+    db.commit()
+    return ApiKeyCreated(**_out(new, new.application.name).model_dump(), key=raw_key)
 
 
 @router.patch("/{key_id}", response_model=ApiKeyOut)

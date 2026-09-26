@@ -1,8 +1,9 @@
 "use client";
 
-import { AlertTriangle, KeyRound, MoreHorizontal, Plus, RotateCcw, ShieldOff, Trash2 } from "lucide-react";
+import { AlertTriangle, KeyRound, MoreHorizontal, Plus, RefreshCw, RotateCcw, ShieldOff, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import {
@@ -38,6 +39,131 @@ const PERMISSION_INFO: Record<Permission, { label: string; description: string }
 };
 
 /* ------------------------------------------------------------------ */
+/* Pantalla "cópiala ahora": la key completa solo existe aquí          */
+/* ------------------------------------------------------------------ */
+
+function KeyReveal({ open, apiKey, onClose, title = "Guarda tu API key", note }: { open: boolean; apiKey: ApiKeyCreated; onClose: () => void; title?: string; note?: React.ReactNode }) {
+  const [acknowledged, setAcknowledged] = useState(false);
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      dismissible={false}
+      title={title}
+      description="Esta es la única vez que verás la key completa. Si la pierdes, podrás regenerarla."
+      footer={
+        <Button variant="primary" onClick={onClose} disabled={!acknowledged}>
+          Listo
+        </Button>
+      }
+    >
+      <div className="space-y-4">
+        <div className="rounded-xl border border-accent/30 bg-accent-soft p-4">
+          <p className="mb-2 text-xs font-medium text-fg-2">
+            {apiKey.name} · {apiKey.application_name}
+          </p>
+          <code className="block font-mono text-[13px] break-all text-fg select-all">{apiKey.key}</code>
+          <div className="mt-3 flex justify-end">
+            <CopyButton value={apiKey.key} label="Copiar key" variant="primary" />
+          </div>
+        </div>
+        {note}
+        <div className="flex gap-2.5 rounded-lg border border-warning/30 bg-warning/10 p-3 text-[13px] text-fg-2">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+          <p>
+            Guárdala en el gestor de secretos o en el <code className="font-mono text-fg">.env</code> de tu aplicación. Nunca la publiques en el frontend ni en un repositorio.
+          </p>
+        </div>
+        <Checkbox checked={acknowledged} onChange={setAcknowledged} label="Ya copié y guardé la key en un lugar seguro" />
+      </div>
+    </Modal>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Regenerar: emite una key nueva y retira la anterior con gracia      */
+/* ------------------------------------------------------------------ */
+
+const GRACE_OPTIONS = [
+  { value: "0", label: "Ninguno" },
+  { value: "24", label: "24 horas" },
+  { value: "168", label: "7 días" },
+] as const;
+
+function RegenerateModal({ apiKey, onClose, onDone }: { apiKey: ApiKey; onClose: () => void; onDone: () => void }) {
+  const [grace, setGrace] = useState<"0" | "24" | "168">(apiKey.effective_status === "active" ? "24" : "0");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<ApiKeyCreated | null>(null);
+
+  async function submit() {
+    setSaving(true);
+    setError(null);
+    try {
+      setCreated(await api<ApiKeyCreated>(`/api-keys/${apiKey.id}/regenerate`, { method: "POST", json: { grace_hours: Number(grace) } }));
+      onDone();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo regenerar la key");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (created) {
+    const label = GRACE_OPTIONS.find((o) => o.value === grace)?.label;
+    return (
+      <KeyReveal
+        open
+        apiKey={created}
+        onClose={onClose}
+        title="Nueva key generada"
+        note={
+          <p className="text-[13px] text-fg-2">
+            {apiKey.effective_status !== "active" || grace === "0"
+              ? "La key anterior ya no funciona."
+              : `La key anterior (${apiKey.prefix}…) seguirá funcionando ${label}. Actualiza tu aplicación antes de que expire.`}
+          </p>
+        }
+      />
+    );
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Regenerar «${apiKey.name}»`}
+      description="Por seguridad no se guarda la key completa, así que no se puede volver a mostrar. Se creará una key nueva con la misma aplicación, permisos y límites."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button variant="primary" onClick={submit} loading={saving} icon={<RefreshCw className="size-4" />}>
+            Regenerar
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {apiKey.effective_status === "active" ? (
+          <>
+            <p className="text-[13px] font-medium text-fg-2">La key actual seguirá funcionando durante</p>
+            <Segmented value={grace} onChange={setGrace} options={GRACE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} />
+            <p className="text-xs text-fg-3">
+              {grace === "0" ? "Se revocará al instante: tu aplicación fallará hasta que pongas la key nueva." : "Tiempo para reemplazarla en tu aplicación sin cortes. Luego expira sola."}
+            </p>
+          </>
+        ) : (
+          <p className="text-[13px] text-fg-2">La key actual está {apiKey.effective_status === "revoked" ? "revocada" : "expirada"} y seguirá sin funcionar.</p>
+        )}
+        <InlineError message={error} />
+      </div>
+    </Modal>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Crear key: formulario → pantalla de "cópiala ahora" (una sola vez)   */
 /* ------------------------------------------------------------------ */
 
@@ -52,7 +178,6 @@ function CreateKeyModal({ open, onClose, applications, onCreated }: { open: bool
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState<ApiKeyCreated | null>(null);
-  const [acknowledged, setAcknowledged] = useState(false);
 
   function reset() {
     setName("");
@@ -63,7 +188,6 @@ function CreateKeyModal({ open, onClose, applications, onCreated }: { open: bool
     setRateLimit("");
     setError(null);
     setCreated(null);
-    setAcknowledged(false);
   }
 
   function close() {
@@ -97,41 +221,7 @@ function CreateKeyModal({ open, onClose, applications, onCreated }: { open: bool
     }
   }
 
-  if (created) {
-    return (
-      <Modal
-        open={open}
-        onClose={close}
-        dismissible={false}
-        title="Guarda tu API key"
-        description="Esta es la única vez que verás la key completa. Si la pierdes, tendrás que crear una nueva."
-        footer={
-          <Button variant="primary" onClick={close} disabled={!acknowledged}>
-            Listo
-          </Button>
-        }
-      >
-        <div className="space-y-4">
-          <div className="rounded-xl border border-accent/30 bg-accent-soft p-4">
-            <p className="mb-2 text-xs font-medium text-fg-2">
-              {created.name} · {created.application_name}
-            </p>
-            <code className="block font-mono text-[13px] break-all text-fg select-all">{created.key}</code>
-            <div className="mt-3 flex justify-end">
-              <CopyButton value={created.key} label="Copiar key" variant="primary" />
-            </div>
-          </div>
-          <div className="flex gap-2.5 rounded-lg border border-warning/30 bg-warning/10 p-3 text-[13px] text-fg-2">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-            <p>
-              Guárdala en el gestor de secretos o en el <code className="font-mono text-fg">.env</code> de tu aplicación. Nunca la publiques en el frontend ni en un repositorio.
-            </p>
-          </div>
-          <Checkbox checked={acknowledged} onChange={setAcknowledged} label="Ya copié y guardé la key en un lugar seguro" />
-        </div>
-      </Modal>
-    );
-  }
+  if (created) return <KeyReveal open={open} apiKey={created} onClose={close} />;
 
   return (
     <Modal
@@ -224,39 +314,103 @@ function CreateKeyModal({ open, onClose, applications, onCreated }: { open: bool
 /* Acciones por key                                                     */
 /* ------------------------------------------------------------------ */
 
-type Action = { type: "revoke" | "reactivate" | "delete"; key: ApiKey } | null;
+type Action = { type: "revoke" | "reactivate" | "delete" | "regenerate"; key: ApiKey } | null;
+
+const MENU_WIDTH = 184;
 
 function KeyActions({ apiKey, onAction }: { apiKey: ApiKey; onAction: (a: Action) => void }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number; up: boolean } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // El menú se dibuja en <body> con posición fija: así no lo recorta el contenedor con scroll de la tabla.
+  // Se recoloca si la página o la tabla se desplazan, y se cierra si el botón sale de la pantalla.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      if (!buttonRef.current) return;
+      const rect = buttonRef.current.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+        setOpen(false);
+        return;
+      }
+      const menuHeight = menuRef.current?.offsetHeight ?? 132;
+      const up = rect.bottom + menuHeight + 8 > window.innerHeight && rect.top > menuHeight + 8;
+      setPos({
+        top: up ? rect.top - menuHeight - 4 : rect.bottom + 4,
+        left: Math.max(8, Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8)),
+        up,
+      });
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    const onPointer = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node) && !buttonRef.current?.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const choose = (a: Action) => {
+    setOpen(false);
+    onAction(a);
+  };
+
   return (
-    <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
+    <div className="inline-block text-left" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
+        ref={buttonRef}
         onClick={() => setOpen((v) => !v)}
-        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
         className="grid size-8 place-items-center rounded-lg text-fg-3 hover:bg-surface-3 hover:text-fg"
         aria-label={`Acciones para ${apiKey.name}`}
+        aria-haspopup="menu"
         aria-expanded={open}
       >
         <MoreHorizontal className="size-4" />
       </button>
-      {open && (
-        <div className="animate-in absolute right-0 z-20 mt-1 w-44 rounded-xl border border-line-strong bg-surface-2 p-1 shadow-xl">
-          {apiKey.status === "active" ? (
-            <MenuItem icon={<ShieldOff className="size-4" />} label="Revocar" onClick={() => onAction({ type: "revoke", key: apiKey })} />
-          ) : (
-            apiKey.effective_status !== "expired" && <MenuItem icon={<RotateCcw className="size-4" />} label="Reactivar" onClick={() => onAction({ type: "reactivate", key: apiKey })} />
-          )}
-          <MenuItem danger icon={<Trash2 className="size-4" />} label="Eliminar" onClick={() => onAction({ type: "delete", key: apiKey })} />
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={{ position: "fixed", top: pos?.top ?? -9999, left: pos?.left ?? -9999, width: MENU_WIDTH, visibility: pos ? "visible" : "hidden" }}
+            className="animate-in z-50 rounded-xl border border-line-strong bg-surface-2 p-1 shadow-2xl shadow-black/40"
+          >
+            <MenuItem icon={<RefreshCw className="size-4" />} label="Regenerar key" onClick={() => choose({ type: "regenerate", key: apiKey })} />
+            {apiKey.status === "active" ? (
+              <MenuItem icon={<ShieldOff className="size-4" />} label="Revocar" onClick={() => choose({ type: "revoke", key: apiKey })} />
+            ) : (
+              apiKey.effective_status !== "expired" && <MenuItem icon={<RotateCcw className="size-4" />} label="Reactivar" onClick={() => choose({ type: "reactivate", key: apiKey })} />
+            )}
+            <div className="my-1 h-px bg-line" />
+            <MenuItem danger icon={<Trash2 className="size-4" />} label="Eliminar" onClick={() => choose({ type: "delete", key: apiKey })} />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
 
 function MenuItem({ icon, label, onClick, danger }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
   return (
-    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onClick} className={cx("flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] hover:bg-surface-3", danger ? "text-critical-text" : "text-fg")}>
+    <button type="button" role="menuitem" onClick={onClick} className={cx("flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] hover:bg-surface-3", danger ? "text-critical-text" : "text-fg")}>
       {icon}
       {label}
     </button>
@@ -369,7 +523,7 @@ export default function ApiKeysPage() {
     { key: "actions", header: <span className="sr-only">Acciones</span>, align: "right", cell: (k) => <KeyActions apiKey={k} onAction={setAction} /> },
   ];
 
-  const confirmCopy = action && {
+  const confirmCopy = action && action.type !== "regenerate" && {
     revoke: {
       title: "Revocar API key",
       confirm: "Revocar",
@@ -464,6 +618,8 @@ export default function ApiKeysPage() {
       </Card>
 
       <CreateKeyModal open={creating} onClose={() => setCreating(false)} applications={apps.data ?? []} onCreated={() => void keys.reload()} />
+
+      {action?.type === "regenerate" && <RegenerateModal apiKey={action.key} onClose={() => setAction(null)} onDone={() => void keys.reload()} />}
 
       {action && confirmCopy && (
         <ConfirmDialog

@@ -58,6 +58,9 @@ Errores: `401` key inválida/revocada/expirada · `403` sin permiso o app deshab
 - Se muestra **una sola vez** al crearla. En la base solo quedan el **hash HMAC** y el **prefijo visible** (`dmk_live_Ab3dE9`).
 - `API_KEY_PEPPER` (en `.env`) es la llave del HMAC: si se pierde, ninguna key existente vuelve a validar. Guárdalo fuera del servidor.
 - Estados: activa · revocada (reactivable) · expirada (no reactivable). Eliminar una key conserva sus logs con el prefijo.
+- **¿Perdiste una key?** No se puede volver a mostrar (no se guarda). Usa **⋯ → Regenerar key**: crea una key nueva con la misma
+  aplicación, nombre, permisos y límite, y la anterior (renombrada «(anterior)») sigue funcionando 0 h, 24 h o 7 días para
+  cambiarla en tu app sin cortes. Endpoint: `POST /api/admin/api-keys/{id}/regenerate` con `{"grace_hours": 0|24|168}`.
 - Cada key pertenece a una **aplicación**; deshabilitar la aplicación bloquea todas sus keys (403).
 
 ## 5. Dashboard y seguridad del administrador

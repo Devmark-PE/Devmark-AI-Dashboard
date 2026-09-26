@@ -127,6 +127,11 @@ class ApiKeyUpdate(BaseModel):
         return validate_permissions(value) if value is not None else None
 
 
+class ApiKeyRegenerate(BaseModel):
+    # Horas que la key anterior sigue funcionando (0 = se revoca al instante).
+    grace_hours: Literal[0, 24, 168] = 24
+
+
 class ApiKeyOut(BaseModel):
     id: uuid.UUID
     name: str
