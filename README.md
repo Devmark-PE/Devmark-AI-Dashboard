@@ -39,6 +39,10 @@ curl https://ai.devmarkpe.com/v1/chat/completions \
 ```
 
 Compatible con los SDK de OpenAI cambiando `base_url` a `https://ai.devmarkpe.com/v1`.
+
+**Con un agente de IA** (Claude Code, Cursor, ChatGPT…): pídele «conecta esta app a DEVMARK AI siguiendo
+https://ai.devmarkpe.com/llms.txt». Esa guía pública explica URL, modelo, ejemplos, errores y reglas de seguridad.
+El prompt completo está en dashboard → **Documentación → Agentes de IA**.
 La key va solo en el backend de cada app (nunca en el frontend). Más ejemplos: dashboard → **Documentación**.
 
 ## Despliegue

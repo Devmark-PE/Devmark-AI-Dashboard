@@ -30,6 +30,7 @@ Puertos abiertos a Internet: solo 22 (SSH), 80 y 443. FastAPI, Ollama y la base 
 |---|---|---|
 | `GET /` | Público | **Navegador → redirige al dashboard** (`/dashboard/`). API/curl/SDKs → JSON de estado (contrato original) |
 | `GET /status` | Público | Estado del servicio en JSON + `ollama: connected/unreachable` (siempre 200) |
+| `GET /llms.txt` | Público | Guía de integración para agentes de IA (Claude, ChatGPT, Cursor…), generada con la configuración real y sin secretos |
 | `GET /health` | Público | `200 healthy` si Ollama responde, `503 degraded` si no |
 | `POST /v1/chat/completions` | API key, permiso `chat` | Chat compatible con OpenAI |
 | `GET /v1/models` | API key, permiso `models` | Modelos disponibles |

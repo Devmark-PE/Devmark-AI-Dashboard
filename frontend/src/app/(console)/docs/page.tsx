@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, BookOpen, Braces, CircleAlert, Gauge, KeyRound, Library, Play, Rocket, ShieldCheck, Terminal, Wrench } from "lucide-react";
+import { ArrowRight, BookOpen, Bot, Braces, CircleAlert, Gauge, KeyRound, Library, Play, Rocket, ShieldCheck, Terminal, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -188,6 +188,7 @@ const RESPONSE = (model: string) => `{
 const SECTIONS = [
   { id: "inicio", label: "Inicio rápido", icon: Rocket },
   { id: "probar", label: "Probar ahora", icon: Play },
+  { id: "agentes", label: "Agentes de IA", icon: Bot },
   { id: "auth", label: "Autenticación", icon: KeyRound },
   { id: "endpoints", label: "Endpoints", icon: Braces },
   { id: "rag", label: "Conocimiento (RAG)", icon: Library },
@@ -477,6 +478,55 @@ export default function DocsPage() {
 
         <Section id="probar" title="Probar ahora" icon={Play} description="Envía una petición real al modelo de tu servidor desde aquí.">
           <TryIt models={installed} defaultModel={defaultModel} />
+        </Section>
+
+        <Section id="agentes" title="Agentes de IA" icon={Bot} description="Deja que Claude, ChatGPT, Cursor o Copilot conecten tus aplicaciones por ti.">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-3 text-sm text-fg-2">
+              <p>
+                DEVMARK publica una guía para agentes en{" "}
+                <a href={`${base}/llms.txt`} target="_blank" rel="noreferrer" className="font-mono text-accent-strong hover:underline">
+                  {base}/llms.txt
+                </a>{" "}
+                (estándar <span className="font-mono">llms.txt</span>): URL, modelo, ejemplos, errores y reglas de seguridad, generada con la configuración real y sin secretos.
+              </p>
+              <ol className="space-y-2">
+                {[
+                  "Crea una API key para la aplicación (API Keys). Usa dmk_test_ mientras desarrollas.",
+                  "Abre el proyecto de tu app con tu agente (Claude Code, Cursor, ChatGPT…) y pega el prompt.",
+                  "El agente te pedirá la key: dásela para que la guarde en el .env del backend, nunca en el código.",
+                  "Comprueba en Logs que las peticiones aparecen con el nombre de la aplicación.",
+                ].map((step, i) => (
+                  <li key={step} className="flex gap-2 text-[13px]">
+                    <span className="grid size-5 shrink-0 place-items-center rounded-full bg-accent-soft text-[11px] font-semibold text-accent-strong">{i + 1}</span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
+              <p className="text-xs text-fg-3">
+                Consejo: guarda el prompt en un archivo <span className="font-mono">AGENTS.md</span> o <span className="font-mono">CLAUDE.md</span> del proyecto para que el agente lo tenga siempre presente.
+              </p>
+            </div>
+            <CodeBlock
+              lang="bash"
+              title="Prompt para tu agente"
+              code={`Conecta esta aplicación a DEVMARK AI,
+la IA privada de la empresa.
+Sigue la guía: ${base}/llms.txt
+
+- API compatible con OpenAI:
+  base URL ${base}/v1
+  modelo ${defaultModel}
+- Pídeme la API key y guárdala en el .env
+  del backend como DEVMARK_API_KEY. Nunca en
+  el frontend ni en el repositorio.
+- Si ya usa OpenAI, cambia solo base URL,
+  key y modelo.
+- Maneja errores 401/429/503; timeout ≥ 120 s.
+- Al terminar, haz una petición de prueba
+  y dime cómo verificarla.`}
+            />
+          </div>
         </Section>
 
         <Section id="auth" title="Autenticación" icon={KeyRound} description="Cada petición a /v1/* lleva una API key en la cabecera Authorization.">

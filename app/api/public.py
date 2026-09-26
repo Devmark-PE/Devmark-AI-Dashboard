@@ -3,6 +3,7 @@
 GET  /                      público (navegadores -> 302 a /dashboard/, el resto recibe el JSON de siempre)
 GET  /status                público (JSON de / + estado de Ollama)
 GET  /health                público (ahora comprueba Ollama de verdad)
+GET  /llms.txt              público: guía de integración para agentes de IA
 POST /v1/chat/completions   Authorization: Bearer <API_KEY>, permiso "chat"
 GET  /v1/models             Authorization: Bearer <API_KEY>, permiso "models"
 """
@@ -15,13 +16,13 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Header, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from app.api.deps import authenticate, client_ip
 from app.config import get_settings
 from app.database import session_scope
-from app.services import ollama, rag, tools
+from app.services import llms_txt, ollama, rag, tools
 from app.services.api_keys import KeyContext
 from app.services.request_log import RequestLogEntry, write_log
 
@@ -212,6 +213,12 @@ async def status():
     except ollama.OllamaError:
         ollama_state = "unreachable"
     return {**_service_info(), "ollama": ollama_state}
+
+
+@router.get("/llms.txt", response_class=PlainTextResponse)
+async def llms():
+    """Guía de integración para agentes de IA (pública, sin secretos)."""
+    return PlainTextResponse(llms_txt.render(), media_type="text/markdown; charset=utf-8", headers={"Cache-Control": "public, max-age=300"})
 
 
 @router.get("/health")
