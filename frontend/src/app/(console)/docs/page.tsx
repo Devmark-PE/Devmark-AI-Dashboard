@@ -164,6 +164,21 @@ export default function DocsPage() {
         </Card>
 
         <Card>
+          <CardHeader title="Conocimiento (RAG)" description="Respuestas basadas en los documentos de tu aplicación" />
+          <div className="space-y-3 px-5 py-4 text-sm text-fg-2">
+            <p>
+              Si la aplicación de tu API key tiene el RAG activo (dashboard → Conocimiento), cada llamada a <code className="font-mono text-fg">/v1/chat/completions</code> busca en sus
+              documentos y añade los fragmentos relevantes como contexto. No hay que cambiar nada en tu código.
+            </p>
+            <p>
+              Para forzarlo o desactivarlo en una petición concreta, añade <code className="font-mono text-fg">&quot;rag&quot;: true</code> o{" "}
+              <code className="font-mono text-fg">&quot;rag&quot;: false</code> al cuerpo. Cuando se usa, la respuesta incluye las fuentes:
+            </p>
+            <Code code={`"rag": {\n  "sources": [\n    { "title": "Preguntas frecuentes", "ordinal": 2, "score": 0.1, "document_id": "…", "chunk_id": 17 }\n  ]\n}`} lang="json" />
+          </div>
+        </Card>
+
+        <Card>
           <CardHeader title="Errores" />
           <div className="scrollbar-thin overflow-x-auto">
             <table className="w-full text-sm">

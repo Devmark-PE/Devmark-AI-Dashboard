@@ -24,7 +24,22 @@ Orden recomendado: de arriba a abajo. Marca `[x]` al terminar.
 
 ---
 
-## 1. Restringir SSH en AWS 🟠 (seguridad, no bloquea el funcionamiento)
+## 1. Desplegar RAG y Playground 🟢
+
+Tras el merge del PR a `main` (servidor, SSH):
+
+```bash
+cd ~/ai-server && git fetch -q origin main && git checkout -q -f -B main origin/main \
+  && venv/bin/pip install -q -r requirements.txt && venv/bin/alembic upgrade head \
+  && sudo systemctl restart devmark-ai
+sudo bash deploy/nginx/install.sh    # permite subir PDFs de hasta 8 MB en /api/admin/rag/
+venv/bin/alembic current             # debe mostrar 0003 (head)
+```
+
+Luego en el dashboard: **Conocimiento (RAG)** → elige la aplicación → *Añadir documento* → *Probar búsqueda* → *Activar RAG*.
+Pruébalo en **Playground** con «Usar documentos de la aplicación».
+
+## 2. Restringir SSH en AWS 🟠 (seguridad, no bloquea el funcionamiento)
 
 **Dónde:** consola AWS → EC2 → Security Groups → Inbound rules.
 
@@ -32,7 +47,7 @@ Orden recomendado: de arriba a abajo. Marca `[x]` al terminar.
 - Deja 80 y 443 abiertos a `0.0.0.0/0`. No abras 8000, 11434 ni 5432.
 - Si tu IP cambia y pierdes acceso: EC2 → Connect → *EC2 Instance Connect* o *Session Manager* y actualiza la regla.
 
-## 2. Migrar tus apps a keys nuevas y retirar la key antigua 🟡
+## 3. Migrar tus apps a keys nuevas y retirar la key antigua 🟡
 
 1. En el dashboard → API Keys, crea una key por aplicación.
 2. En cada app, reemplaza el valor de la key antigua por la nueva `dmk_live_…` (en su `.env`, nunca en el frontend).
@@ -42,12 +57,12 @@ Orden recomendado: de arriba a abajo. Marca `[x]` al terminar.
    echo "LEGACY_API_KEY_ENABLED=false" >> ~/ai-server/.env && sudo systemctl restart devmark-ai
    ```
 
-## 3. A tener en cuenta 🔵
+## 4. A tener en cuenta 🔵
 
 - **Supabase plan gratuito**: se pausa tras 7 días sin actividad. Si la API recibe tráfico a diario no pasa; si se pausa, reactívalo desde la consola.
 - **RAM (2 GB)**: el servidor funciona al límite con el modelo cargado. Evita instalar servicios nuevos en el EC2 (bases de datos, Node, Docker) y usa un solo modelo.
 
-## 4. Flujo de trabajo con ramas
+## 5. Flujo de trabajo con ramas
 
 - Se trabaja en **`dev`**. Para publicar: GitHub → *Pull requests* → *New* → base `main` ← compare `dev` → *Create* → *Merge*.
 - Después del merge, actualiza el servidor con el comando de `docs/ARQUITECTURA.md` §9.

@@ -137,7 +137,10 @@ export default function ApplicationsPage() {
                     <p className="truncate font-mono text-xs text-fg-3">{app.slug}</p>
                   </div>
                 </div>
-                <StatusBadge status={app.status} />
+                <div className="flex flex-col items-end gap-1">
+                  <StatusBadge status={app.status} />
+                  {app.rag_enabled && <span className="text-[11px] font-medium text-accent-strong">RAG activo</span>}
+                </div>
               </div>
               <p className="mt-3 line-clamp-2 min-h-10 text-[13px] text-fg-2">{app.description || <span className="text-fg-3">Sin descripción</span>}</p>
               <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-4 text-xs">
@@ -158,9 +161,14 @@ export default function ApplicationsPage() {
                 </div>
               </dl>
               <div className="mt-4 flex items-center gap-1 border-t border-line pt-3">
-                <Link href={`/api-keys/?application=${app.id}`} className="mr-auto text-[13px] font-medium text-accent-strong hover:underline">
-                  Ver keys →
-                </Link>
+                <div className="mr-auto flex items-center gap-3">
+                  <Link href={`/api-keys/?application=${app.id}`} className="text-[13px] font-medium text-accent-strong hover:underline">
+                    Keys →
+                  </Link>
+                  <Link href={`/knowledge/?application=${app.id}`} className="text-[13px] font-medium text-accent-strong hover:underline">
+                    Conocimiento{app.document_count ? ` (${app.document_count})` : ""} →
+                  </Link>
+                </div>
                 <Button size="sm" variant="ghost" icon={<Pencil className="size-3.5" />} onClick={() => setEditing(app)} aria-label={`Editar ${app.name}`} />
                 <Button size="sm" variant="ghost" icon={<Power className="size-3.5" />} onClick={() => setConfirm({ type: "toggle", app })} aria-label={app.status === "active" ? `Deshabilitar ${app.name}` : `Habilitar ${app.name}`} />
                 <Button size="sm" variant="ghost" icon={<Trash2 className="size-3.5" />} onClick={() => setConfirm({ type: "delete", app })} aria-label={`Eliminar ${app.name}`} />

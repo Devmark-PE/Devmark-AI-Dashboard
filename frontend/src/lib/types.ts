@@ -27,6 +27,42 @@ export interface Application {
   active_key_count: number;
   last_used_at: string | null;
   requests_30d: number;
+  rag_enabled: boolean;
+  rag_top_k: number;
+  document_count: number;
+}
+
+export interface RagDocument {
+  id: string;
+  application_id: string;
+  application_name: string | null;
+  title: string;
+  filename: string | null;
+  source_type: "text" | "txt" | "md" | "pdf";
+  size_bytes: number;
+  char_count: number;
+  chunk_count: number;
+  created_at: string;
+  chunks?: { ordinal: number; content: string }[];
+}
+
+export interface RagResult {
+  chunk_id: number;
+  document_id: string;
+  title: string;
+  ordinal: number;
+  score: number;
+  content: string;
+}
+
+export interface PlaygroundResponse {
+  model: string;
+  content: string;
+  finish_reason: "stop" | "length";
+  usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  processing_ms: number;
+  load_ms: number;
+  rag: { used: boolean; search_ms: number | null; sources: RagResult[] } | null;
 }
 
 export type Permission = "chat" | "models";

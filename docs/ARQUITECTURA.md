@@ -79,11 +79,34 @@ Errores: `401` key inválida/revocada/expirada · `403` sin permiso o app deshab
 | `applications` | Apps cliente (`rate_limit_rpm`, `monthly_token_quota` preparados) |
 | `api_keys` | Hash + prefijo, permisos, estado, expiración, último uso, `rate_limit_rpm` |
 | `api_request_logs` | Una fila por request: app, key, endpoint, modelo, tokens, tiempo, estado, error |
+| `rag_documents` | Documentos de conocimiento por aplicación (título, tipo, tamaño, nº de fragmentos) |
+| `rag_chunks` | Fragmentos indexados (índice FTS en español) |
 
-- Migraciones con **Alembic** (`migrations/`). `0002` activa RLS y revoca `anon`/`authenticated`: la API REST pública de Supabase no puede leer estas tablas.
+- Migraciones con **Alembic** (`migrations/`). `0003` crea las tablas RAG. `0002` y `0003` activan RLS y revoca `anon`/`authenticated`: la API REST pública de Supabase no puede leer estas tablas.
 - Conexión por **Session pooler** (IPv4) con `sslmode=require`. El backend no usa ninguna key de Supabase.
 
-## 7. Ajustes para 2 GB de RAM
+## 7. Conocimiento (RAG) y Playground
+
+**RAG por aplicación** (dashboard → *Conocimiento (RAG)*):
+
+1. Se sube un documento (texto pegado, `.txt`, `.md` o `.pdf` con texto, máx. 8 MB) a una aplicación.
+2. Se divide en fragmentos de ~700 caracteres (respetando párrafos y frases) y se guardan en `rag_chunks`.
+3. PostgreSQL indexa cada fragmento con **búsqueda de texto completo en español** (`to_tsvector('spanish', …)`, índice GIN).
+   Se indexa el texto con y sin acentos: «ubicados» encuentra «Ubicación» y «cuanto» encuentra «cuánto».
+4. En cada pregunta se buscan los `rag_top_k` fragmentos más relevantes **de esa aplicación** y se añaden al system prompt
+   con la instrucción de no inventar y citar la fuente `[n]`.
+
+Uso desde la API: si la aplicación tiene **RAG activo**, `/v1/chat/completions` lo aplica automáticamente con sus keys.
+Por petición se puede forzar o desactivar con `"rag": true|false`. La respuesta añade `rag.sources` (título, fragmento, relevancia).
+
+No usa RAM del EC2: la búsqueda corre en Supabase. Preparado para pgvector (búsqueda semántica) añadiendo una columna
+`embedding` a `rag_chunks` y combinando puntuaciones en `app/services/rag.py`, sin cambiar endpoints.
+
+**Playground** (dashboard → *Playground*): chat con el Ollama del servidor usando la sesión de administrador (sin API key).
+Permite elegir modelo, system prompt, temperatura, máx. tokens y, opcionalmente, los documentos de una aplicación;
+muestra tiempo, tokens, carga del modelo y las **fuentes usadas**. Se registra en Logs como `/playground`.
+
+## 8. Ajustes para 2 GB de RAM
 
 - Sin PostgreSQL ni Node en el servidor (Supabase + dashboard estático).
 - Ollama (drop-in `deploy/ollama/devmark.conf`): 1 modelo cargado, 1 generación a la vez, modelo en memoria 24 h, contexto de 2048 tokens.
@@ -93,7 +116,7 @@ Errores: `401` key inválida/revocada/expirada · `403` sin permiso o app deshab
 - FastAPI: un worker, pool de conexiones pequeño, cliente HTTP compartido hacia Ollama.
 - Swap de 2 GB ya existente.
 
-## 8. Estructura del repositorio
+## 9. Estructura del repositorio
 
 ```
 app/
@@ -115,7 +138,7 @@ docs/                esta documentación y PENDIENTES.md
 tests/               pytest (API pública, keys, admin, CLI)
 ```
 
-## 9. Ramas y despliegue
+## 10. Ramas y despliegue
 
 ```
 dev   ── aquí se trabaja (Claude, OpenCode, tú). Cada cambio llega por commit o PR.
@@ -135,10 +158,10 @@ cd ~/ai-server && git fetch -q origin main && git checkout -q -f -B main origin/
 
 Si cambias el frontend: `cd frontend && npm run export:app` y commitea `app/static/dashboard` (el servidor no compila Node).
 
-## 10. Preparado para lo siguiente
+## 11. Preparado para lo siguiente
 
 - **Cuotas**: `monthly_token_quota` por aplicación ya existe en la tabla; falta aplicarla en `authenticate`.
 - **Rate limit distribuido**: `app/services/rate_limit.py` es en memoria (un worker); se reemplaza por Postgres/Redis sin tocar endpoints.
-- **RAG**: pgvector en Supabase; tablas `rag_sources` / `rag_documents` por `application_id`.
+- **RAG semántico**: añadir embeddings con pgvector a `rag_chunks` (hoy: texto completo en español).
 - **Tools / function calling**: tabla `tools` por aplicación y ejecución en `app/services/`.
 - **Streaming (SSE)**: `stream: true` hoy devuelve la respuesta completa.

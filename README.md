@@ -1,7 +1,7 @@
 # DEVmark AI
 
 Plataforma privada de IA sobre **FastAPI + Ollama**: API compatible con OpenAI, gestión de API keys
-por aplicación, logs, uso, estado del sistema y un dashboard de administración.
+por aplicación, base de conocimiento (RAG) por aplicación, Playground, logs, uso, estado del sistema y un dashboard de administración.
 
 ```
 Clientes ── https://ai.devmarkpe.com/v1 ── Nginx ── FastAPI ─┬─ Ollama (127.0.0.1:11434)
@@ -17,7 +17,7 @@ Admin ───── https://ai.devmarkpe.com  (el navegador entra directo al d
 | `app/api/admin/` | API del dashboard (`/api/admin/*`): auth, keys, aplicaciones, logs, uso, modelos, sistema |
 | `app/services/` | Ollama, API keys (HMAC), sesiones, logs, estadísticas, comprobaciones del sistema |
 | `app/models/` | Tablas: `users`, `admin_sessions`, `applications`, `api_keys`, `api_request_logs` |
-| `migrations/` | Alembic (0001 esquema, 0002 bloqueo de la API REST de Supabase) |
+| `migrations/` | Alembic (0001 esquema, 0002 bloqueo de la API REST de Supabase, 0003 RAG) |
 | `frontend/` | Dashboard Next.js + TypeScript + Tailwind (export estático) |
 | `app/static/dashboard/` | Build del dashboard que sirve FastAPI en `/dashboard` |
 | `deploy/` | Servicio systemd, **guía de despliegue** (`deploy/DEPLOY.md`), Nginx (`deploy/nginx/`) y Ollama (`deploy/ollama/`) |
@@ -46,5 +46,5 @@ npm run export:app                     # build estático → app/static/dashboar
 ## Preparado para lo siguiente
 
 - **Rate limiting / cuotas**: `rate_limit_rpm` por key y por aplicación (activo), `monthly_token_quota` (columna lista).
-- **RAG**: PostgreSQL + pgvector (Supabase lo incluye) con tablas `rag_sources` / `rag_documents` por aplicación.
+- **RAG semántico**: embeddings con pgvector sobre `rag_chunks` (hoy: búsqueda de texto completo en español, ya activa).
 - **Tools / function calling**: tabla `tools` por aplicación y ejecución desde `app/services/`.
