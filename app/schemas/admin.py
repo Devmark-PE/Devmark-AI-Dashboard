@@ -82,6 +82,8 @@ class ApplicationUpdate(BaseModel):
     status: Literal["active", "disabled"] | None = None
     rate_limit_rpm: int | None = Field(default=None, ge=1, le=100_000)
     monthly_token_quota: int | None = Field(default=None, ge=1)
+    rag_enabled: bool | None = None
+    rag_top_k: int | None = Field(default=None, ge=1, le=8)
 
 
 class ApplicationOut(BaseModel):
@@ -98,6 +100,9 @@ class ApplicationOut(BaseModel):
     active_key_count: int = 0
     last_used_at: datetime | None = None
     requests_30d: int = 0
+    rag_enabled: bool = False
+    rag_top_k: int = 3
+    document_count: int = 0
 
 
 # --- API keys ---
@@ -153,3 +158,40 @@ class ApiKeyOut(BaseModel):
 class ApiKeyCreated(ApiKeyOut):
     # La key completa: se devuelve UNA sola vez, al crearla.
     key: str
+
+
+# --- RAG ---
+
+MAX_DOCUMENT_BYTES = 8 * 1024 * 1024
+
+
+class RagDocumentCreate(BaseModel):
+    application_id: uuid.UUID
+    title: str = Field(min_length=2, max_length=200)
+    # Texto pegado directamente, o un archivo (.txt/.md/.pdf) en base64.
+    text: str | None = Field(default=None, max_length=2_000_000)
+    filename: str | None = Field(default=None, max_length=255)
+    content_base64: str | None = Field(default=None, max_length=12_000_000)
+
+
+class RagSearchRequest(BaseModel):
+    application_id: uuid.UUID
+    query: str = Field(min_length=1, max_length=2000)
+    top_k: int = Field(default=3, ge=1, le=10)
+
+
+# --- Playground ---
+
+class PlaygroundMessage(BaseModel):
+    role: Literal["system", "user", "assistant"]
+    content: str = Field(max_length=48_000)
+
+
+class PlaygroundRequest(BaseModel):
+    model: str = Field(min_length=1, max_length=120)
+    messages: list[PlaygroundMessage] = Field(min_length=1, max_length=100)
+    temperature: float | None = Field(default=None, ge=0, le=2)
+    max_tokens: int | None = Field(default=None, ge=1, le=8192)
+    application_id: uuid.UUID | None = None
+    use_rag: bool = False
+    top_k: int = Field(default=3, ge=1, le=8)

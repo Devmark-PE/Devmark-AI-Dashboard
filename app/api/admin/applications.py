@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import AdminContext, current_admin, get_admin_db
 from app.database import utcnow
-from app.models import ApiKey, ApiRequestLog, Application
+from app.models import ApiKey, ApiRequestLog, Application, RagDocument
 from app.schemas.admin import ApplicationCreate, ApplicationOut, ApplicationUpdate
 
 router = APIRouter(prefix="/applications", tags=["admin:applications"])
@@ -57,6 +57,13 @@ def _serialize(db: Session, apps: list[Application]) -> list[ApplicationOut]:
             .group_by(ApiRequestLog.application_id)
         ).all()
     )
+    doc_counts = dict(
+        db.execute(
+            select(RagDocument.application_id, func.count(RagDocument.id))
+            .where(RagDocument.application_id.in_(ids))
+            .group_by(RagDocument.application_id)
+        ).all()
+    )
     out = []
     for app in apps:
         stats = key_stats.get(app.id)
@@ -75,6 +82,9 @@ def _serialize(db: Session, apps: list[Application]) -> list[ApplicationOut]:
                 active_key_count=stats.active if stats else 0,
                 last_used_at=stats.last_used if stats else None,
                 requests_30d=request_counts.get(app.id, 0),
+                rag_enabled=bool(app.rag_enabled),
+                rag_top_k=app.rag_top_k or 3,
+                document_count=doc_counts.get(app.id, 0),
             )
         )
     return out
@@ -126,7 +136,7 @@ def update_application(
     for field, value in body.model_dump(exclude_unset=True).items():
         if field in {"name", "description"} and value is not None:
             value = value.strip()
-        if field in {"name", "status"} and value is None:
+        if field in {"name", "status", "rag_enabled", "rag_top_k"} and value is None:
             continue
         setattr(app, field, value)
     db.commit()
@@ -138,5 +148,8 @@ def delete_application(app_id: uuid.UUID, db: Session = Depends(get_admin_db), _
     app = _get(db, app_id)
     if db.scalar(select(func.count(ApiKey.id)).where(ApiKey.application_id == app.id)):
         raise HTTPException(status_code=409, detail="Elimina primero las API keys de esta aplicación (o deshabilítala)")
+    # Los documentos RAG de la aplicación se eliminan con ella (ON DELETE CASCADE).
+    for document in db.scalars(select(RagDocument).where(RagDocument.application_id == app.id)):
+        db.delete(document)
     db.delete(app)
     db.commit()

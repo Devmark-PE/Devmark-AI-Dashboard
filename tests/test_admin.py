@@ -103,7 +103,8 @@ def test_models_and_system(admin, ollama):
     assert by_id["model"]["status"] == "online"
     assert by_id["nginx"]["status"] == "unknown"  # la petición de test no pasa por Nginx
     assert by_id["https"]["status"] == "unknown"  # dominio de test inexistente: nunca "online" sin comprobar
-    assert by_id["rag"]["status"] == "not_configured"
+    assert by_id["rag"]["status"] == "online" and "0 documentos" in by_id["rag"]["detail"]
+    assert by_id["tools"]["status"] == "not_configured"
 
 
 def test_models_when_ollama_down(admin):
