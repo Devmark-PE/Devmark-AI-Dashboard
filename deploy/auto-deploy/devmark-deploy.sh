@@ -16,7 +16,10 @@ STATE_DIR="${STATE_DIR:-/var/lib/devmark-deploy}"
 exec 9>/run/devmark-deploy.lock
 flock -n 9 || { echo "Otro despliegue en curso"; exit 0; }
 
-as_app() { runuser -u "$APP_USER" -- "$@"; }
+# setpriv (sin PAM): no llena el journal con «session opened/closed» en cada revisión.
+APP_HOME=$(getent passwd "$APP_USER" | cut -d: -f6)
+as_app() { setpriv --reuid="$(id -u "$APP_USER")" --regid="$(id -g "$APP_USER")" --init-groups \
+  env HOME="$APP_HOME" USER="$APP_USER" "$@"; }
 cd "$APP_DIR"
 
 as_app git fetch -q origin "$BRANCH"
