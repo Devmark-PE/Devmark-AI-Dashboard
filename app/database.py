@@ -56,8 +56,13 @@ def get_engine() -> Engine | None:
     if not settings.database_enabled:
         return None
     if _engine is None:
+        connect_args = {}
+        if ":6543/" in settings.database_url:
+            # Pooler en modo "transaction" (Supabase/PgBouncer): sin prepared statements.
+            connect_args["prepare_threshold"] = None
         _engine = create_engine(
             settings.database_url,
+            connect_args=connect_args,
             pool_pre_ping=True,
             # Pool pequeño: el servidor tiene poca RAM y un solo worker.
             pool_size=5,

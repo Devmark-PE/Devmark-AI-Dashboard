@@ -36,6 +36,7 @@ async def overview(db: Session = Depends(get_admin_db), _: AdminContext = Depend
         "api_status": "online",
         "ollama_status": ollama_status,
         "default_model": settings.default_model,
+        "timezone": settings.dashboard_timezone,
         "total_requests": stats.total_requests(db),
         "today": today["totals"],
         "today_series": today["series"],
