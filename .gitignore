@@ -5,6 +5,13 @@
 *.pem
 *.key
 *.p12
+*.ppk
+# Llave SSH de AWS (con o sin extensión) y carpetas de llaves locales
+aws-ollama-key*
+**/aws-ollama-key*
+keys/
+llaves/
+.ssh/
 
 # Python / FastAPI
 __pycache__/
