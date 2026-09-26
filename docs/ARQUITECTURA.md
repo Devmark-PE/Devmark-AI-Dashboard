@@ -73,6 +73,9 @@ Errores: `401` key inválida/revocada/expirada · `403` sin permiso o app deshab
   solo tras el código. Desactivar 2FA o regenerar códigos exige contraseña + código.
 - **Recuperar contraseña**: con SMTP configurado se envía un enlace de un solo uso (30 min, solo hash en la base);
   al usarlo se cierran todas las sesiones. La respuesta es igual exista o no el email. Sin SMTP: `app.cli reset-password`.
+- **Correos** (`app/services/emails.py`, plantilla con la marca, HTML + texto): enlace de recuperación y avisos de seguridad
+  (contraseña cambiada, 2FA activada/desactivada, códigos de recuperación nuevos) con fecha e IP. Se envían en segundo plano
+  y nunca incluyen contraseñas, códigos ni API keys.
 - Cada acción que modifica datos exige la cabecera `X-CSRF-Token` de la sesión.
 - Bloqueo tras 5 intentos fallidos (15 min, en la app) + límite de Nginx en `/api/admin/auth/login`.
 - Una API key **no** da acceso al dashboard.

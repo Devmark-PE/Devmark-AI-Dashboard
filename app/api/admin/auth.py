@@ -10,7 +10,7 @@ import time
 import uuid
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -30,12 +30,18 @@ from app.schemas.admin import (
     UserOut,
     normalize_email,
 )
-from app.services import mailer, passwords, sessions, totp
+from app.services import emails, mailer, passwords, sessions, totp
 
 router = APIRouter(prefix="/auth", tags=["admin:auth"])
 
 MFA_TOKEN_TTL = 300  # 5 minutos para introducir el código
 RESET_TOKEN_TTL = timedelta(minutes=30)
+
+
+def notify(background: BackgroundTasks, user: User, email: emails.Email) -> None:
+    """Envía un aviso de cuenta después de responder (no retrasa la petición). Sin SMTP no hace nada."""
+    if mailer.is_configured():
+        background.add_task(mailer.send, user.email, email.subject, email.text, email.html)
 
 
 def _me(user: User, csrf: str, expires_at) -> MeOut:
@@ -196,7 +202,13 @@ def totp_setup(db: Session = Depends(get_admin_db), ctx: AdminContext = Depends(
 
 
 @router.post("/2fa/enable")
-def totp_enable(body: TotpCode, db: Session = Depends(get_admin_db), ctx: AdminContext = Depends(current_admin)):
+def totp_enable(
+    body: TotpCode,
+    request: Request,
+    background: BackgroundTasks,
+    db: Session = Depends(get_admin_db),
+    ctx: AdminContext = Depends(current_admin),
+):
     user = ctx.user
     if user.totp_enabled:
         raise HTTPException(status_code=409, detail="La verificación en dos pasos ya está activa")
@@ -214,6 +226,7 @@ def totp_enable(body: TotpCode, db: Session = Depends(get_admin_db), ctx: AdminC
     # Por seguridad se cierran las demás sesiones abiertas.
     db.execute(delete(AdminSession).where(AdminSession.user_id == user.id, AdminSession.id != ctx.session.id))
     db.commit()
+    notify(background, user, emails.two_factor_enabled(user.name or user.email, client_ip(request)))
     return {"enabled": True, "recovery_codes": codes}
 
 
@@ -225,7 +238,13 @@ async def _confirm_identity(db: Session, user: User, body: TotpConfirm) -> None:
 
 
 @router.post("/2fa/disable")
-async def totp_disable(body: TotpConfirm, db: Session = Depends(get_admin_db), ctx: AdminContext = Depends(current_admin)):
+async def totp_disable(
+    body: TotpConfirm,
+    request: Request,
+    background: BackgroundTasks,
+    db: Session = Depends(get_admin_db),
+    ctx: AdminContext = Depends(current_admin),
+):
     if not ctx.user.totp_enabled:
         raise HTTPException(status_code=409, detail="La verificación en dos pasos no está activa")
     await _confirm_identity(db, ctx.user, body)
@@ -234,41 +253,31 @@ async def totp_disable(body: TotpConfirm, db: Session = Depends(get_admin_db), c
     ctx.user.totp_last_step = None
     ctx.user.recovery_codes = None
     db.commit()
+    notify(background, ctx.user, emails.two_factor_disabled(ctx.user.name or ctx.user.email, client_ip(request)))
     return {"enabled": False}
 
 
 @router.post("/2fa/recovery-codes")
-async def totp_regenerate_codes(body: TotpConfirm, db: Session = Depends(get_admin_db), ctx: AdminContext = Depends(current_admin)):
+async def totp_regenerate_codes(
+    body: TotpConfirm,
+    request: Request,
+    background: BackgroundTasks,
+    db: Session = Depends(get_admin_db),
+    ctx: AdminContext = Depends(current_admin),
+):
     if not ctx.user.totp_enabled:
         raise HTTPException(status_code=409, detail="La verificación en dos pasos no está activa")
     await _confirm_identity(db, ctx.user, body)
     codes = totp.generate_recovery_codes()
     ctx.user.recovery_codes = [totp.hash_recovery_code(c) for c in codes]
     db.commit()
+    notify(background, ctx.user, emails.recovery_codes_regenerated(ctx.user.name or ctx.user.email, client_ip(request)))
     return {"recovery_codes": codes}
 
 
 # ---------------------------------------------------------------------------
 # Recuperación de contraseña por email
 # ---------------------------------------------------------------------------
-
-RESET_EMAIL_TEXT = """Hola {name},
-
-Recibimos una solicitud para restablecer la contraseña de tu cuenta de Devmark AI.
-Abre este enlace (válido 30 minutos, un solo uso):
-
-{link}
-
-Si no fuiste tú, ignora este mensaje: tu contraseña no cambiará.
-"""
-
-RESET_EMAIL_HTML = """<div style="font-family:system-ui,sans-serif;max-width:480px;margin:auto;padding:24px;color:#111">
-<h2 style="margin:0 0 12px">Restablecer contraseña</h2>
-<p>Hola {name}, recibimos una solicitud para restablecer la contraseña de tu cuenta de <b>Devmark AI</b>.</p>
-<p><a href="{link}" style="display:inline-block;background:#5b4bdb;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Crear nueva contraseña</a></p>
-<p style="color:#666;font-size:13px">El enlace vence en 30 minutos y solo se puede usar una vez. Si no fuiste tú, ignora este mensaje.</p>
-</div>"""
-
 
 def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
@@ -296,16 +305,15 @@ async def forgot_password(body: ForgotPasswordRequest, request: Request, db: Ses
         db.add(PasswordResetToken(user_id=user.id, token_hash=_hash_token(token), expires_at=now + RESET_TOKEN_TTL, ip=ip))
         db.commit()
         link = f"{get_settings().public_base_url}/dashboard/reset-password/?token={token}"
-        name = user.name or user.email
-        await run_in_threadpool(
-            mailer.send, user.email, "Restablece tu contraseña de Devmark AI",
-            RESET_EMAIL_TEXT.format(name=name, link=link), RESET_EMAIL_HTML.format(name=name, link=link),
-        )
+        email_msg = emails.password_reset(user.name or user.email, link, int(RESET_TOKEN_TTL.total_seconds() // 60))
+        await run_in_threadpool(mailer.send, user.email, email_msg.subject, email_msg.text, email_msg.html)
     return {"email_configured": configured}
 
 
 @router.post("/password/reset", status_code=204)
-async def reset_password(body: ResetPasswordRequest, request: Request, db: Session = Depends(get_admin_db)):
+async def reset_password(
+    body: ResetPasswordRequest, request: Request, background: BackgroundTasks, db: Session = Depends(get_admin_db)
+):
     ip = client_ip(request) or "unknown"
     key = f"reset|{ip}"
     if sessions.login_blocked(key):
@@ -327,3 +335,4 @@ async def reset_password(body: ResetPasswordRequest, request: Request, db: Sessi
     db.execute(delete(AdminSession).where(AdminSession.user_id == user.id))
     db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id, PasswordResetToken.id != record.id))
     db.commit()
+    notify(background, user, emails.password_changed(user.name or user.email, ip, via_reset=True))
