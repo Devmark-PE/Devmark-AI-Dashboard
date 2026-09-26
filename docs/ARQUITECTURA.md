@@ -87,7 +87,8 @@ Errores: `401` key inválida/revocada/expirada · `403` sin permiso o app deshab
 ## 7. Ajustes para 2 GB de RAM
 
 - Sin PostgreSQL ni Node en el servidor (Supabase + dashboard estático).
-- Ollama (drop-in `deploy/ollama/devmark.conf`): 1 modelo cargado, 1 generación a la vez, modelo en memoria 24 h.
+- Ollama (drop-in `deploy/ollama/devmark.conf`): 1 modelo cargado, 1 generación a la vez, modelo en memoria 24 h, contexto de 2048 tokens.
+- Con el modelo cargado quedan ~100 MB libres: el servidor funciona al límite. La solución de fondo es t4g.medium (4 GB); requiere Elastic IP y actualizar el DNS.
 - FastAPI: un worker, pool de conexiones pequeño, cliente HTTP compartido hacia Ollama.
 - Swap de 2 GB ya existente.
 
