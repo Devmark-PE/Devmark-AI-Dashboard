@@ -151,6 +151,11 @@ export default function DocsPage() {
           <Endpoint method="GET" path="/v1/models" auth="API key · models">
             <p>Lista los modelos disponibles en formato OpenAI (<code className="font-mono">{`{"object": "list", "data": [...]}`}</code>).</p>
           </Endpoint>
+          <Endpoint method="GET" path="/status" auth="público">
+            <p>
+              Información del servicio y estado del modelo. Siempre <code className="font-mono">200 {`{"status":"online","service":"Devmark AI API","model":"...","ollama":"connected"}`}</code> (<code className="font-mono">ollama</code> es <code className="font-mono">unreachable</code> si el modelo no responde).
+            </p>
+          </Endpoint>
           <Endpoint method="GET" path="/health" auth="público">
             <p>
               Estado del servicio. <code className="font-mono">200 {`{"status":"healthy","ollama":"connected"}`}</code> o <code className="font-mono">503</code> si el modelo no está disponible.
