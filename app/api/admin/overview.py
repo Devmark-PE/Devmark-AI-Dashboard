@@ -8,7 +8,7 @@ from app.api.admin.logs import serialize_log
 from app.api.deps import AdminContext, current_admin, get_admin_db
 from app.config import get_settings
 from app.models import ApiKey, ApiRequestLog, Application
-from app.services import ollama, stats
+from app.services import ai_state, ollama, stats
 
 router = APIRouter(prefix="/overview", tags=["admin:overview"])
 
@@ -35,6 +35,7 @@ async def overview(db: Session = Depends(get_admin_db), _: AdminContext = Depend
     return {
         "api_status": "online",
         "ollama_status": ollama_status,
+        "ai_paused": ai_state.get_state(db)["paused"],
         "default_model": settings.default_model,
         "timezone": settings.dashboard_timezone,
         "total_requests": stats.total_requests(db),

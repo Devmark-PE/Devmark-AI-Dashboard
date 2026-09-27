@@ -3,6 +3,7 @@
 GET  /                      público (navegadores -> 302 a /dashboard/, el resto recibe el JSON de siempre)
 GET  /status                público (JSON de / + estado de Ollama)
 GET  /health                público (ahora comprueba Ollama de verdad)
+GET  /llms.txt              público: guía de integración para agentes de IA
 POST /v1/chat/completions   Authorization: Bearer <API_KEY>, permiso "chat"
 GET  /v1/models             Authorization: Bearer <API_KEY>, permiso "models"
 """
@@ -15,13 +16,13 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Header, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from app.api.deps import authenticate, client_ip
 from app.config import get_settings
 from app.database import session_scope
-from app.services import ollama, rag, tools
+from app.services import ai_state, llms_txt, ollama, rag, tools
 from app.services.api_keys import KeyContext
 from app.services.request_log import RequestLogEntry, write_log
 
@@ -195,6 +196,10 @@ def _service_info() -> dict[str, str]:
     return {"status": "online", "service": "Devmark AI API", "model": get_settings().default_model}
 
 
+async def _ai_mode() -> str:
+    return "paused" if await run_in_threadpool(ai_state.is_paused) else "active"
+
+
 @router.get("/")
 async def root(request: Request):
     # Negociación de contenido: un navegador (Accept con text/html) va al dashboard;
@@ -211,7 +216,13 @@ async def status():
         ollama_state = "connected"
     except ollama.OllamaError:
         ollama_state = "unreachable"
-    return {**_service_info(), "ollama": ollama_state}
+    return {**_service_info(), "ollama": ollama_state, "ai": await _ai_mode()}
+
+
+@router.get("/llms.txt", response_class=PlainTextResponse)
+async def llms():
+    """Guía de integración para agentes de IA (pública, sin secretos)."""
+    return PlainTextResponse(llms_txt.render(), media_type="text/markdown; charset=utf-8", headers={"Cache-Control": "public, max-age=300"})
 
 
 @router.get("/health")
@@ -220,6 +231,8 @@ async def health():
         await ollama.version()
     except ollama.OllamaError:
         return JSONResponse(status_code=503, content={"status": "degraded", "ollama": "unreachable"})
+    if await _ai_mode() == "paused":
+        return {"status": "paused", "ollama": "connected"}  # pausa intencional: no es una caída
     return {"status": "healthy", "ollama": "connected"}
 
 
@@ -231,6 +244,8 @@ async def openai_chat(
     authorization: str | None = Header(default=None),
 ):
     context = await authenticate(authorization, "chat")
+    if await run_in_threadpool(ai_state.is_paused):
+        return openai_error(503, ai_state.PAUSED_MESSAGE, "service_unavailable", "ai_paused")
     settings = get_settings()
     started = time.perf_counter()
     start_time = time.time()

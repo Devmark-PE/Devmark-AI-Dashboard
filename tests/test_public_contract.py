@@ -27,10 +27,10 @@ def test_root_json_accept_keeps_contract(client):
 
 def test_status(client, ollama):
     r = client.get("/status")
-    assert r.status_code == 200 and r.json() == {**SERVICE_INFO, "ollama": "connected"}
+    assert r.status_code == 200 and r.json() == {**SERVICE_INFO, "ollama": "connected", "ai": "active"}
     ollama.get("/api/version").mock(side_effect=httpx.ConnectError("down"))
     r = client.get("/status")
-    assert r.status_code == 200 and r.json() == {**SERVICE_INFO, "ollama": "unreachable"}
+    assert r.status_code == 200 and r.json() == {**SERVICE_INFO, "ollama": "unreachable", "ai": "active"}
 
 def test_health_real_check(client, ollama):
     assert client.get("/health").json() == {"status": "healthy", "ollama": "connected"}
@@ -118,3 +118,12 @@ def test_legacy_chat_endpoint_removed(client, ollama):
     # POST /chat (endpoint original sin autenticación) se eliminó: ninguna app lo usaba.
     assert client.post("/chat", json={"message": "hola"}).status_code in (404, 405)
     assert not ollama.calls
+
+
+def test_llms_txt_for_ai_agents(client):
+    r = client.get("/llms.txt")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/markdown")
+    text = r.text
+    assert "https://example.invalid/v1" in text and "llama3.2:1b" in text
+    assert "Authorization: Bearer" in text and "nunca" in text.lower()
+    assert "legacy-test-key-123" not in text and "pepper" not in text.lower()  # sin secretos

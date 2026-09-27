@@ -30,6 +30,7 @@ Puertos abiertos a Internet: solo 22 (SSH), 80 y 443. FastAPI, Ollama y la base 
 |---|---|---|
 | `GET /` | Público | **Navegador → redirige al dashboard** (`/dashboard/`). API/curl/SDKs → JSON de estado (contrato original) |
 | `GET /status` | Público | Estado del servicio en JSON + `ollama: connected/unreachable` (siempre 200) |
+| `GET /llms.txt` | Público | Guía de integración para agentes de IA (Claude, ChatGPT, Cursor…), generada con la configuración real y sin secretos |
 | `GET /health` | Público | `200 healthy` si Ollama responde, `503 degraded` si no |
 | `POST /v1/chat/completions` | API key, permiso `chat` | Chat compatible con OpenAI |
 | `GET /v1/models` | API key, permiso `models` | Modelos disponibles |
@@ -92,9 +93,10 @@ Errores: `401` key inválida/revocada/expirada · `403` sin permiso o app deshab
 | `api_request_logs` | Una fila por request: app, key, endpoint, modelo, tokens, tiempo, estado, error |
 | `rag_documents` | Documentos de conocimiento por aplicación (título, tipo, tamaño, nº de fragmentos) |
 | `rag_chunks` | Fragmentos indexados (índice FTS en español) |
+| `platform_state` | Estado global (modo reposo de la IA: pausada, cuándo y por quién) |
 | `tools`, `application_tools` | Herramientas (URL, parámetros, cabeceras cifradas) y a qué aplicaciones se asignan |
 
-- Migraciones con **Alembic** (`migrations/`). `0003` crea las tablas RAG, `0004` la 2FA y la recuperación de contraseña, `0005` las herramientas. `0002`–`0005` activan RLS y revoca `anon`/`authenticated`: la API REST pública de Supabase no puede leer estas tablas.
+- Migraciones con **Alembic** (`migrations/`). `0003` crea las tablas RAG, `0004` la 2FA y la recuperación de contraseña, `0005` las herramientas, `0006` el modo reposo. `0002`–`0006` activan RLS y revoca `anon`/`authenticated`: la API REST pública de Supabase no puede leer estas tablas.
 - Conexión por **Session pooler** (IPv4) con `sslmode=require`. El backend no usa ninguna key de Supabase.
 
 ## 7. Conocimiento (RAG) y Playground
@@ -142,6 +144,19 @@ Seguridad:
 - Para Supabase: usar una key con permisos de solo lectura (o una vista/tabla con RLS que solo permita `select`).
 
 Tablas: `tools` y `application_tools` (migración `0005`). El Playground permite probarlas y ver cada llamada con su resultado.
+
+## 7c. Modo reposo (Pausar / Activar IA)
+
+Interruptor en el **Dashboard** para no ocupar la RAM cuando la IA no se necesita, sin apagar el servidor
+(apagar el EC2 cambiaría la IP y el dominio dejaría de funcionar).
+
+- **Pausar IA**: descarga de la RAM los modelos cargados en Ollama (`keep_alive: 0`, libera ~1,3 GB).
+  `/v1/chat/completions` responde `503` con `code: "ai_paused"` y el Playground no genera. El dashboard, `/v1/models`,
+  `/status` (`"ai": "paused"`) y `/health` (`200`, `"status": "paused"`: pausa intencional, no caída) siguen funcionando.
+- **Activar IA**: vuelve a aceptar peticiones y precarga el modelo por defecto en segundo plano (unos segundos).
+- El estado se guarda en la tabla `platform_state` (migración `0006`): sobrevive a reinicios y despliegues.
+  Se cachea 3 s en memoria para no consultar la base en cada petición. Queda registrado quién y cuándo lo cambió.
+- API del dashboard: `GET/POST /api/admin/ai-power` (`{"paused": true|false}`).
 
 ## 8. Ajustes para 2 GB de RAM
 

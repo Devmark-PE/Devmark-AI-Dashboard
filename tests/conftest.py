@@ -30,7 +30,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.database import Base, get_engine  # noqa: E402
 from app.main import app  # noqa: E402
-from app.services import rate_limit, sessions  # noqa: E402
+from app.services import ai_state, rate_limit, sessions  # noqa: E402
 
 OLLAMA = "http://127.0.0.1:11434"
 LEGACY = {"Authorization": "Bearer legacy-test-key-123"}
@@ -55,6 +55,7 @@ def _clean_state():
     Base.metadata.create_all(engine)
     rate_limit.reset()
     sessions.reset_throttle()
+    ai_state.reset_cache()
     yield
 
 

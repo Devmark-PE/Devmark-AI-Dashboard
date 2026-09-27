@@ -139,6 +139,7 @@ export interface Usage {
 export interface Overview {
   api_status: Status;
   ollama_status: Status;
+  ai_paused: boolean;
   default_model: string;
   timezone: string;
   total_requests: number;

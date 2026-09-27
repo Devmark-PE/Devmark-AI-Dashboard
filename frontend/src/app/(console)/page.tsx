@@ -3,6 +3,7 @@
 import { Activity, ArrowRight, Clock, Cpu, Gauge, Hash, Server, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
+import { AiPowerCard } from "@/components/AiPowerCard";
 import { TimeChart } from "@/components/charts/TimeChart";
 import { requestColumns } from "@/components/RequestColumns";
 import { DataTable } from "@/components/ui/DataTable";
@@ -38,6 +39,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <AiPowerCard />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard label="Requests hoy" value={formatNumber(t.requests)} icon={<Activity className="size-4" />} detail={`${compactNumber(data.total_requests)} en total`} />
