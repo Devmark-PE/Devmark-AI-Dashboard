@@ -5,6 +5,8 @@ on:
   pull_request:
   push:
     branches: [dev, main]
+  schedule:
+    - cron: "17 13 * * 1"   # lunes: detecta vulnerabilidades nuevas aunque no haya cambios
 
 jobs:
   backend:
@@ -26,6 +28,8 @@ jobs:
           python-version: "3.13"
           cache: pip
       - run: pip install -r requirements-dev.txt
+      - name: Auditoría de seguridad (dependencias Python)
+        run: pip install pip-audit && pip-audit -r requirements.txt --progress-spinner off
       - run: ruff check app tests migrations main.py
       - name: Tests (SQLite)
         run: pytest -q
@@ -47,6 +51,8 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
     defaults:
       run:
         working-directory: frontend
@@ -58,5 +64,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - name: Auditoría de seguridad (dependencias npm)
+        run: npm audit --audit-level=high
       - run: npx tsc --noEmit
       - run: npm run build

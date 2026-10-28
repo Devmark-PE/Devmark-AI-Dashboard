@@ -209,6 +209,15 @@ sus archivos. Es *pull*: GitHub no necesita llaves SSH del servidor ni puertos a
 **CI** (`.github/workflows/ci.yml`): en cada push/PR ejecuta ruff, pytest (SQLite y PostgreSQL 16), migraciones
 arriba/abajo, `tsc` y el build del dashboard.
 
+**Seguridad de dependencias:**
+- El CI audita las dependencias en cada push/PR y **cada lunes** aunque no haya cambios: `pip-audit` (Python) y
+  `npm audit --audit-level=high` (frontend). Una vulnerabilidad alta o crítica pone el CI en rojo.
+- **Dependabot** (`.github/dependabot.yml`) abre PRs contra `dev` con actualizaciones semanales (npm, pip) y mensuales
+  (GitHub Actions). Se revisan y mergean como cualquier PR; el despliegue automático hace el resto.
+- Node.js/Next.js **no corre en producción**: el dashboard es un export estático que sirve FastAPI. Las vulnerabilidades
+  de servidor de Next (optimización de imágenes, Server Actions, ISR, `use cache`) no son explotables en el EC2, pero
+  igual se mantiene Next actualizado porque compila el dashboard.
+
 Actualizar producción a mano (si el despliegue automático no está instalado):
 
 ```bash

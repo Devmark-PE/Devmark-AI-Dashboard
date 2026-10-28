@@ -1,0 +1,34 @@
+# Actualizaciones automáticas de dependencias: Dependabot abre un PR (contra dev) cuando hay versiones nuevas
+# o parches de seguridad. El CI los prueba; se mergean como cualquier otro PR.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minor:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: pip
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      backend-patch:
+        update-types: [patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: monthly
