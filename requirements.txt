@@ -20,7 +20,7 @@ uvicorn==0.54.0
 SQLAlchemy==2.1.6
 psycopg[binary]==3.3.6
 alembic==1.20.1
-pypdf==6.21.3
+pypdf==6.21.4
 # Cifrado de secretos de Tools (cabeceras)
 cryptography==50.0.2
 cffi==2.1.1
