@@ -21,6 +21,7 @@ Apps (API keys) ───┘          │  (TLS, límites,   (app/, un worker)  
 | **Ollama** | EC2, `127.0.0.1:11434`, servicio `ollama` | Ejecuta el modelo. Nunca expuesto a Internet |
 | **Supabase** | Nube (Postgres 17) | Usuarios, sesiones, aplicaciones, API keys (hash), logs |
 | **Dashboard** | Archivos estáticos en `app/static/dashboard` | Next.js compilado; lo sirve FastAPI en `/dashboard` |
+| **Página informativa** | Archivos estáticos en `app/static/landing` | Next.js compilado (`landing/`); FastAPI entrega su HTML en `/` a los navegadores y sus archivos en `/landing` |
 
 Puertos abiertos a Internet: solo 22 (SSH), 80 y 443. FastAPI, Ollama y la base de datos no son accesibles desde fuera.
 
@@ -28,7 +29,9 @@ Puertos abiertos a Internet: solo 22 (SSH), 80 y 443. FastAPI, Ollama y la base 
 
 | Ruta | Acceso | Uso |
 |---|---|---|
-| `GET /` | Público | **Navegador → redirige al dashboard** (`/dashboard/`). API/curl/SDKs → JSON de estado (contrato original) |
+| `GET /` | Público | **Navegador (`Accept: text/html`) → página informativa** (200, HTML). API/curl/SDKs → JSON de estado (contrato original, sin cambios). Si la página no está compilada, el navegador va a `/dashboard/` |
+| `/landing/*` | Público | Archivos de la página informativa (JS, CSS, fuente, imagen para redes). No es una página para enlazar: la portada es `/` |
+| `GET /robots.txt`, `/sitemap.xml` | Público | SEO de la página informativa |
 | `GET /status` | Público | Estado del servicio en JSON + `ollama: connected/unreachable` (siempre 200) |
 | `GET /llms.txt` | Público | Guía de integración para agentes de IA (Claude, ChatGPT, Cursor…), generada con la configuración real y sin secretos |
 | `GET /health` | Público | `200 healthy` si Ollama responde, `503 degraded` si no |
@@ -183,7 +186,9 @@ app/
   schemas/           validación del API de administración
   cli.py             setup-env, check-db, create-admin, reset-password, list-admins
   static/dashboard/  build del frontend (generado con npm run export:app)
+  static/landing/    build de la página informativa (generado con npm run export:app en landing/)
 frontend/            código fuente del dashboard (Next.js + TypeScript + Tailwind)
+landing/             código fuente de la página informativa (Next.js + Tailwind, solo español)
 migrations/          Alembic
 deploy/              servicio systemd, DEPLOY.md, nginx/, ollama/ (ajustes), auto-deploy/ (despliegue desde main)
 docs/                esta documentación y PENDIENTES.md
@@ -207,7 +212,7 @@ Si no responde en 60 s vuelve a la versión anterior y no reintenta ese commit. 
 sus archivos. Es *pull*: GitHub no necesita llaves SSH del servidor ni puertos abiertos. Registro: `journalctl -u devmark-deploy`.
 
 **CI** (`.github/workflows/ci.yml`): en cada push/PR ejecuta ruff, pytest (SQLite y PostgreSQL 16), migraciones
-arriba/abajo, `tsc` y el build del dashboard.
+arriba/abajo, `tsc` y el build del dashboard y de la página informativa.
 
 Actualizar producción a mano (si el despliegue automático no está instalado):
 
@@ -218,6 +223,7 @@ cd ~/ai-server && git fetch -q origin main && git checkout -q -f -B main origin/
 ```
 
 Si cambias el frontend: `cd frontend && npm run export:app` y commitea `app/static/dashboard` (el servidor no compila Node).
+Igual con la página informativa: `cd landing && npm run export:app` y commitea `app/static/landing`.
 
 ## 11. Preparado para lo siguiente
 

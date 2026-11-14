@@ -15,11 +15,6 @@ BROWSER_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,image/av
 SERVICE_INFO = {"status": "online", "service": "Devmark AI API", "model": "llama3.2:1b"}
 
 
-def test_root_browser_redirects_to_dashboard(client):
-    r = client.get("/", headers={"Accept": BROWSER_ACCEPT}, follow_redirects=False)
-    assert r.status_code == 302 and r.headers["location"] == "/dashboard/"
-
-
 def test_root_json_accept_keeps_contract(client):
     r = client.get("/", headers={"Accept": "application/json"})
     assert r.status_code == 200 and r.json() == SERVICE_INFO

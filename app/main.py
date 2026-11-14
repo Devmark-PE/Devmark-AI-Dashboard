@@ -17,6 +17,7 @@ from app.services import ollama
 
 logging.basicConfig(level=logging.INFO)
 
+# Dashboard y página informativa: sitio estático de Next.js, sin recursos externos.
 DASHBOARD_CSP = "; ".join(
     [
         "default-src 'self'",
@@ -84,7 +85,8 @@ def create_app() -> FastAPI:
         if path.startswith("/api/admin"):
             # Nada del panel de administración debe quedar en caché.
             response.headers["Cache-Control"] = "no-store"
-        elif path.startswith("/dashboard"):
+        elif path.startswith(("/dashboard", "/landing")) or (path == "/" and "text/html" in response.headers.get("content-type", "")):
+            # Misma política para el dashboard y la página informativa (también servida en "/" a navegadores).
             response.headers["Content-Security-Policy"] = DASHBOARD_CSP
             if "/_next/static/" not in path:
                 response.headers["Cache-Control"] = "no-cache"
@@ -103,6 +105,11 @@ def create_app() -> FastAPI:
         @app.get("/dashboard", include_in_schema=False)
         async def dashboard_missing():
             return {"detail": "Dashboard no compilado. Ver deploy/DEPLOY.md"}
+
+    landing_dir = settings.landing_dir
+    if landing_dir and os.path.isdir(landing_dir):
+        # Archivos de la página informativa; el HTML de "/" lo entrega public.root solo a navegadores.
+        app.mount("/landing", StaticFiles(directory=landing_dir, html=True), name="landing")
 
     return app
 
