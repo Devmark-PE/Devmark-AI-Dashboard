@@ -1,9 +1,9 @@
 # Producción (EC2 ARM64, Python 3.14)
-annotated-doc==0.0.5
+annotated-doc==0.0.6
 annotated-types==0.8.0
 anyio==4.15.1
 certifi==2026.10.23
-click==8.5.0
+click==8.5.1
 fastapi==0.141.1
 h11==0.16.0
 httpcore==1.0.9
@@ -13,12 +13,12 @@ pydantic==2.13.5
 pydantic_core==2.46.5
 python-dotenv==1.2.4
 starlette==1.7.0
-typing-inspection==0.4.4
+typing-inspection==0.4.5
 typing_extensions==4.16.0
 uvicorn==0.54.0
 # Plataforma Devmark AI (PostgreSQL)
-SQLAlchemy==2.1.6
-psycopg[binary]==3.3.6
+SQLAlchemy==2.1.8
+psycopg[binary]==3.3.8
 alembic==1.20.1
 pypdf==6.21.4
 # Cifrado de secretos de Tools (cabeceras)
