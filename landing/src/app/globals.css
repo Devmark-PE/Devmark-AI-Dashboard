@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/* Tokens de la marca (mismos valores que frontend/src/app/globals.css). Solo tema oscuro. */
+:root {
+  color-scheme: dark;
+  --bg: #08090c;
+  --bg-subtle: #0c0d11;
+  --surface: #111318;
+  --surface-2: #161920;
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text: #f3f4f6;
+  --text-2: #a6abb8;
+  --accent: #8b7cff;
+  --accent-strong: #a397ff;
+  --accent-soft: rgba(139, 124, 255, 0.12);
+  --accent-ink: #0b0a1a;
+  --blue: #3987e5;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-fg: var(--text);
+  --color-fg-2: var(--text-2);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+  --font-brand: "Braze", var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Fuente de marca Braze: solo A–Z, para el nombre DEVMARK. */
+@font-face {
+  font-family: "Braze";
+  src: url("/landing/fonts/Braze.woff2") format("woff2");
+  unicode-range: U+0020, U+0041-005A;
+  font-display: swap;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+  background: var(--bg);
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { text-wrap: balance; }
+p, li, summary { text-wrap: pretty; }
+::selection { background: var(--accent-soft); }
+
+/* Foco visible en todo lo interactivo. */
+:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.text-brand-gradient {
+  background: linear-gradient(90deg, #a397ff, #3987e5);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Resplandor sutil de marca detrás de la portada. */
+.hero-glow {
+  background:
+    radial-gradient(48rem 26rem at 80% -10%, rgba(139, 124, 255, 0.16), transparent 60%),
+    radial-gradient(34rem 22rem at 0% 30%, rgba(57, 135, 229, 0.08), transparent 60%);
+}
+
+/* Aparición al hacer scroll. Sin JS o con movimiento reducido todo se ve de inmediato. */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  .reveal:not(.in) { opacity: 0; transform: translateY(16px); }
+  .reveal { transition: opacity 700ms var(--ease), transform 700ms var(--ease); }
+  .tagline .word { color: rgba(243, 244, 246, 0.3); transition: color 500ms var(--ease); }
+  .tagline .word.on { color: var(--text); }
+}
+
+summary { list-style: none; }
+summary::-webkit-details-marker { display: none; }
+details[open] > summary .chev { transform: rotate(180deg); }
+.chev { transition: transform 300ms var(--ease); }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}

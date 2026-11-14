@@ -67,6 +67,7 @@ class Settings:
     cookie_secure: bool = True
     session_ttl_hours: int = 12
     dashboard_dir: str | None = None
+    landing_dir: str | None = None
     dashboard_timezone: str = "America/Lima"
     public_base_url: str = "https://ai.devmarkpe.com"
 
@@ -92,6 +93,7 @@ class Settings:
 def load_settings() -> Settings:
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     default_dashboard = os.path.join(base_dir, "app", "static", "dashboard")
+    default_landing = os.path.join(base_dir, "app", "static", "landing")
 
     settings = Settings(
         ollama_url=os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/"),
@@ -110,6 +112,7 @@ def load_settings() -> Settings:
         cookie_secure=_bool("COOKIE_SECURE", True),
         session_ttl_hours=_int("SESSION_TTL_HOURS", 12),
         dashboard_dir=os.getenv("DASHBOARD_DIR") or default_dashboard,
+        landing_dir=os.getenv("LANDING_DIR") or default_landing,
         dashboard_timezone=os.getenv("DASHBOARD_TIMEZONE", "America/Lima"),
         public_base_url=os.getenv("PUBLIC_BASE_URL", "https://ai.devmarkpe.com").rstrip("/"),
         log_request_content=_bool("LOG_REQUEST_CONTENT", False),

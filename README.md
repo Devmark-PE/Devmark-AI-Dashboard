@@ -9,7 +9,7 @@ API keys por aplicación, conocimiento propio (RAG), Playground, uso, logs, esta
 ```
 Apps (API key) ── https://ai.devmarkpe.com/v1 ──┐
                                                  ├─ Nginx (TLS, límites) ── FastAPI :8000 ─┬─ Ollama :11434 (llama3.2:1b)
-Admin (navegador) ── https://ai.devmarkpe.com ──┘                                          └─ Supabase PostgreSQL
+Navegador ── https://ai.devmarkpe.com ──────┘                                          └─ Supabase PostgreSQL
 ```
 
 El servidor es un EC2 **t4g.small** (ARM64, 2 GB). Solo 80/443 (y SSH restringido) están abiertos: FastAPI, Ollama y la base de datos no son accesibles desde Internet.
@@ -49,7 +49,7 @@ La key va solo en el backend de cada app (nunca en el frontend). Más ejemplos: 
 ## Despliegue
 
 - **Ramas:** se trabaja en `dev`; producción es `main`. Todo cambio llega por Pull Request `dev → main`.
-- **CI** (GitHub Actions): ruff, pytest en SQLite y PostgreSQL, migraciones arriba/abajo, `tsc` y build del dashboard.
+- **CI** (GitHub Actions): ruff, pytest en SQLite y PostgreSQL, migraciones arriba/abajo, `tsc` y build del dashboard y de la página informativa.
 - **Despliegue automático:** el servidor revisa `main` cada 2 minutos; instala dependencias y aplica migraciones solo si
   cambiaron, reinicia y comprueba que responde. Si la versión nueva falla, **vuelve sola a la anterior**.
   Registro: `journalctl -u devmark-deploy -n 30 --no-pager`.
@@ -61,13 +61,15 @@ Instalación inicial y comandos manuales: [`deploy/DEPLOY.md`](deploy/DEPLOY.md)
 | Ruta | Contenido |
 |---|---|
 | `main.py` | Punto de entrada (`uvicorn main:app`) |
-| `app/api/public.py` | `/`, `/status`, `/health`, `/v1/chat/completions`, `/v1/models` |
+| `app/api/public.py` | `/` (navegador → página informativa; resto → JSON), `/robots.txt`, `/sitemap.xml`, `/status`, `/health`, `/llms.txt`, `/v1/chat/completions`, `/v1/models` |
 | `app/api/admin/` | API del dashboard (`/api/admin/*`): auth y 2FA, aplicaciones, keys, RAG, herramientas, playground, logs, uso, modelos, sistema, configuración |
 | `app/services/` | Ollama, API keys (HMAC), sesiones, TOTP, correo y plantillas, RAG, herramientas, cifrado de secretos, límites, logs |
 | `app/models/` | Tablas (usuarios, sesiones, aplicaciones, keys, logs, RAG, tokens de recuperación) |
 | `migrations/` | Alembic: `0001` esquema · `0002` bloqueo de la API REST de Supabase · `0003` RAG · `0004` 2FA y recuperación · `0005` herramientas · `0006` modo reposo |
 | `frontend/` | Dashboard Next.js + TypeScript + Tailwind (export estático, fuente de marca Braze) |
 | `app/static/dashboard/` | Build del dashboard que sirve FastAPI en `/dashboard` |
+| `landing/` | Página informativa para prospectos y clientes (Next.js export estático + Tailwind, solo español). Textos en `landing/src/lib/content.ts`; WhatsApp, presentación y URLs en `landing/src/lib/site.ts` |
+| `app/static/landing/` | Build de la página informativa: FastAPI entrega `index.html` en `/` solo a navegadores y sus archivos en `/landing` |
 | `deploy/` | Servicio systemd, `DEPLOY.md`, Nginx, ajustes de Ollama y despliegue automático |
 | `docs/` | [`ARQUITECTURA.md`](docs/ARQUITECTURA.md) (cómo funciona todo), [`GUIA-RAG-Y-HERRAMIENTAS.md`](docs/GUIA-RAG-Y-HERRAMIENTAS.md) (cómo subir información y crear herramientas) y [`PENDIENTES.md`](docs/PENDIENTES.md) |
 | `tests/` | pytest: API pública, keys, admin, RAG, herramientas, 2FA, recuperación, correos, CLI |
@@ -103,6 +105,10 @@ python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 cd frontend && npm install
 npm run dev                            # http://localhost:3000/dashboard (proxy a FastAPI en :8000)
 npm run export:app                     # build estático → app/static/dashboard (commitear el resultado)
+
+cd landing && npm install
+npm run dev                            # http://localhost:3001/landing/
+npm run export:app                     # build estático → app/static/landing (commitear el resultado)
 ```
 
 ## Siguientes pasos

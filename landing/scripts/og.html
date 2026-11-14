@@ -1,0 +1,27 @@
+<!doctype html>
+<!-- Fuente de landing/public/og.png (1200x630). Regenerar:
+     chrome --headless --hide-scrollbars --window-size=1200,630 --screenshot=public/og.png file:///RUTA/landing/scripts/og.html -->
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: Braze; src: url("../public/fonts/Braze.woff2") format("woff2"); }
+  * { margin: 0; box-sizing: border-box; }
+  body { width: 1200px; height: 630px; background: #08090c; color: #f3f4f6; font-family: "Segoe UI", system-ui, sans-serif; position: relative; overflow: hidden; }
+  .glow { position: absolute; inset: 0; background: radial-gradient(700px 420px at 85% -5%, rgba(139,124,255,.28), transparent 60%), radial-gradient(520px 360px at 0% 100%, rgba(57,135,229,.16), transparent 60%); }
+  .wrap { position: relative; padding: 72px 80px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; }
+  .logo { display: flex; align-items: center; gap: 18px; }
+  .name { font-family: Braze, sans-serif; font-size: 44px; letter-spacing: .06em; }
+  .name span { color: #a6abb8; }
+  .badge { background: rgba(139,124,255,.16); color: #a397ff; font-weight: 700; font-size: 22px; letter-spacing: .08em; padding: 6px 12px; border-radius: 10px; }
+  h1 { font-size: 76px; line-height: 1.04; font-weight: 650; letter-spacing: -.02em; max-width: 940px; }
+  h1 em { font-style: normal; background: linear-gradient(90deg, #a397ff, #3987e5); -webkit-background-clip: text; color: transparent; }
+  p { font-size: 28px; color: #a6abb8; }
+</style>
+<div class="glow"></div>
+<div class="wrap">
+  <div class="logo">
+    <svg width="64" height="64" viewBox="0 0 32 32"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a397ff"/><stop offset="1" stop-color="#3987e5"/></linearGradient></defs><rect x="1" y="1" width="30" height="30" rx="8" fill="#0b0a1a" stroke="url(#g)" stroke-opacity=".55"/><path d="M10 9.5h6.2c4.1 0 6.8 2.6 6.8 6.5s-2.7 6.5-6.8 6.5H10z" fill="none" stroke="url(#g)" stroke-width="2.4" stroke-linejoin="round"/><circle cx="16.2" cy="16" r="2.1" fill="#a397ff"/></svg>
+    <div class="name">DEV<span>MARK</span></div><div class="badge">AI</div>
+  </div>
+  <h1>La IA de tu empresa, <em>privada y con tu conocimiento</em></h1>
+  <p>API compatible con OpenAI · ai.devmarkpe.com</p>
+</div>

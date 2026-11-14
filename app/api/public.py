@@ -1,6 +1,7 @@
 """API pública: los endpoints originales, con el mismo contrato de respuesta.
 
-GET  /                      público (navegadores -> 302 a /dashboard/, el resto recibe el JSON de siempre)
+GET  /                      público (navegadores -> página informativa; el resto recibe el JSON de siempre)
+GET  /robots.txt, /sitemap.xml  públicos (SEO de la página informativa)
 GET  /status                público (JSON de / + estado de Ollama)
 GET  /health                público (ahora comprueba Ollama de verdad)
 GET  /llms.txt              público: guía de integración para agentes de IA
@@ -10,13 +11,14 @@ GET  /v1/models             Authorization: Bearer <API_KEY>, permiso "models"
 
 from __future__ import annotations
 
+import os
 import time
 import uuid
 from typing import Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Header, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 
 from app.api.deps import authenticate, client_ip
@@ -200,13 +202,33 @@ async def _ai_mode() -> str:
     return "paused" if await run_in_threadpool(ai_state.is_paused) else "active"
 
 
+def _landing_file(name: str) -> str | None:
+    landing_dir = get_settings().landing_dir
+    path = os.path.join(landing_dir, name) if landing_dir else None
+    return path if path and os.path.isfile(path) else None
+
+
 @router.get("/")
 async def root(request: Request):
-    # Negociación de contenido: un navegador (Accept con text/html) va al dashboard;
-    # curl, SDKs, Accept: application/json, */* o sin Accept reciben el JSON de siempre.
+    # Negociación de contenido: un navegador (Accept con text/html) recibe la página informativa
+    # (o, si no está compilada, va al dashboard); curl, SDKs, Accept: application/json, */* o sin Accept
+    # reciben el JSON de siempre.
     if "text/html" in request.headers.get("accept", "").lower():
+        index = _landing_file("index.html")
+        if index:
+            return FileResponse(index, media_type="text/html; charset=utf-8", headers={"Vary": "Accept"})
         return RedirectResponse("/dashboard/", status_code=302, headers={"Vary": "Accept"})
     return JSONResponse(_service_info(), headers={"Vary": "Accept"})
+
+
+@router.get("/robots.txt", include_in_schema=False)
+@router.get("/sitemap.xml", include_in_schema=False)
+async def landing_seo(request: Request):
+    name = request.url.path.lstrip("/")
+    path = _landing_file(name)
+    if not path:
+        return Response(status_code=404)
+    return FileResponse(path, media_type="text/plain; charset=utf-8" if name.endswith(".txt") else "application/xml")
 
 
 @router.get("/status")
